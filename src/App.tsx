@@ -28,7 +28,15 @@ import {
   Activity,
   ChevronRight,
   Upload,
-  Menu
+  Menu,
+  Search,
+  Megaphone,
+  AlertTriangle,
+  HelpCircle,
+  Scale,
+  FileBox,
+  Calculator,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -60,7 +68,12 @@ type Screen =
   | 'INQUIRY_RESULT'
   | 'DRAFTS'
   | 'DOCUMENTS'
-  | 'PENSION_CALC_RESULT';
+  | 'PENSION_CALC_RESULT'
+  | 'COMPLAINT'
+  | 'FAQ'
+  | 'LAWS'
+  | 'FORMS'
+  | 'INSURANCE_CALC';
 
 type ServiceCategory = 'INSURED' | 'PENSIONER' | 'BENEFICIARY' | 'GOV_AGENCY' | 'VISITOR';
 
@@ -142,8 +155,29 @@ const Button = ({
 };
 
 const Card = ({ children, className, ...props }: { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('bg-white p-4 rounded-gov shadow-gov border border-gray-100', className)} {...props}>
+  <div className={cn(
+    'bg-white p-5 rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100/80 transition-all duration-300 hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)] hover:-translate-y-0.5', 
+    className
+  )} {...props}>
     {children}
+  </div>
+);
+
+const NewsTicker = () => (
+  <div className="bg-gov-green text-white text-xs flex items-center overflow-hidden relative h-8 shadow-sm">
+    <div className="bg-orange-500 text-white px-3 flex items-center gap-1 z-10 absolute right-0 h-full shadow-[2px_0_8px_rgba(0,0,0,0.2)]">
+      <Megaphone size={14} />
+      <span className="font-bold">عاجل</span>
+    </div>
+    <div className="whitespace-nowrap animate-marquee pr-24 flex gap-8">
+      <span>بدء صرف معاشات شهر مارس 2026 عبر مكاتب البريد والبنوك المعتمدة</span>
+      <span>•</span>
+      <span>ندعو جميع المتقاعدين لتحديث بياناتهم البنكية عبر التطبيق لتجنب تأخير الصرف</span>
+      <span>•</span>
+      <span>إطلاق حزمة خدمات إلكترونية جديدة تشمل حاسبة المعاش التقديرية</span>
+      <span>•</span>
+      <span>تسهيل إجراءات تقديم إقرار الحياة السنوي إلكترونياً للمتقاعدين</span>
+    </div>
   </div>
 );
 
@@ -336,6 +370,9 @@ export default function App() {
         </div>
       </header>
 
+      {/* News Ticker */}
+      <NewsTicker />
+
       {/* Content */}
       <main className="flex-1 p-4 pb-24 overflow-y-auto">
         <motion.div
@@ -351,24 +388,28 @@ export default function App() {
       {/* Bottom Nav */}
       {showNav && isLoggedIn && (
         <nav className={cn(
-          "fixed bottom-0 left-0 right-0 max-w-md mx-auto border-t flex justify-around p-2 z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]",
-          isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+          "fixed bottom-0 left-0 right-0 max-w-md mx-auto flex justify-around p-2 z-50 backdrop-blur-xl border-t transition-all duration-300",
+          isDarkMode ? "bg-gray-900/90 border-gray-800" : "bg-white/90 border-gray-200"
         )}>
-          <button onClick={() => navigate('DASHBOARD')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors', screen === 'DASHBOARD' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+          <button onClick={() => navigate('DASHBOARD')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors relative', screen === 'DASHBOARD' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+            {screen === 'DASHBOARD' && <motion.div layoutId="nav-indicator" className="absolute -top-2 w-8 h-1 bg-gov-green rounded-b-full" />}
             <LayoutDashboard size={22} />
             <span className="text-[10px] font-bold">الرئيسية</span>
           </button>
-          <button onClick={() => navigate('REQUESTS')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors', screen === 'REQUESTS' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+          <button onClick={() => navigate('REQUESTS')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors relative', screen === 'REQUESTS' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+            {screen === 'REQUESTS' && <motion.div layoutId="nav-indicator" className="absolute -top-2 w-8 h-1 bg-gov-green rounded-b-full" />}
             <FileText size={22} />
             <span className="text-[10px] font-bold">الطلبات</span>
           </button>
-          <button onClick={() => navigate('SERVICES')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors', screen === 'SERVICES' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+          <button onClick={() => navigate('SERVICES')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors relative', screen === 'SERVICES' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+            {screen === 'SERVICES' && <motion.div layoutId="nav-indicator" className="absolute -top-2 w-8 h-1 bg-gov-green rounded-b-full" />}
             <Menu size={22} />
             <span className="text-[10px] font-bold">الخدمات</span>
           </button>
-          <button onClick={() => navigate('PROFILE')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors', screen === 'PROFILE' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+          <button onClick={() => navigate('PROFILE')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors relative', screen === 'PROFILE' ? 'text-gov-green' : 'text-gov-text-secondary')}>
+            {screen === 'PROFILE' && <motion.div layoutId="nav-indicator" className="absolute -top-2 w-8 h-1 bg-gov-green rounded-b-full" />}
             <User size={22} />
-            <span className="text-[10px] font-bold">الملف الشخصي</span>
+            <span className="text-[10px] font-bold">حسابي</span>
           </button>
         </nav>
       )}
@@ -414,30 +455,86 @@ export default function App() {
     </PageWrapper>
   );
 
-  const ServicesScreen = () => (
-    <PageWrapper title="الخدمات الإلكترونية" showNav={isLoggedIn}>
-      <div className="grid grid-cols-1 gap-3">
-        {[
-          { title: 'خدمات المؤمن عليهم', icon: <User size={24} />, color: 'bg-blue-50 text-blue-600', cat: 'INSURED' },
-          { title: 'خدمات المتقاعدين', icon: <Activity size={24} />, color: 'bg-green-50 text-green-600', cat: 'PENSIONER' },
-          { title: 'خدمات المستفيدين', icon: <FileText size={24} />, color: 'bg-orange-50 text-orange-600', cat: 'BENEFICIARY' },
-          { title: 'خدمات الجهات الحكومية', icon: <LayoutDashboard size={24} />, color: 'bg-purple-50 text-purple-600', cat: 'GOV_AGENCY' },
-          { title: 'الزوار', icon: <Info size={24} />, color: 'bg-gray-50 text-gray-600', cat: 'VISITOR' },
-        ].map((item, idx) => (
-          <Card key={idx} className={cn("flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition-colors", isDarkMode && "bg-gray-800 border-gray-700 hover:bg-gray-700")} onClick={() => navigateToCategory(item.cat as ServiceCategory)}>
-            <div className={cn('p-3 rounded-full', item.color)}>
-              {item.icon}
+  const ServicesScreen = () => {
+    const [searchQuery, setSearchQuery] = useState('');
+    
+    const allServices = Object.values(servicesData).flatMap(cat => cat.items);
+    const filteredServices = searchQuery 
+      ? allServices.filter(s => 
+          s.title.includes(searchQuery) || 
+          s.description.includes(searchQuery)
+        )
+      : [];
+
+    return (
+      <PageWrapper title="الخدمات الإلكترونية" showNav={isLoggedIn}>
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="ابحث عن خدمة (مثال: شهادة، معاش...)" 
+              className={cn(
+                "w-full pl-4 pr-10 py-3 rounded-xl border focus:border-gov-green focus:ring-1 focus:ring-gov-green outline-none transition-all",
+                isDarkMode ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-200 text-gray-900"
+              )}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {searchQuery ? (
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-gov-text-secondary mb-2">نتائج البحث ({filteredServices.length})</h3>
+              {filteredServices.length > 0 ? (
+                filteredServices.map(item => (
+                  <Card key={item.id} className={cn("flex items-center gap-4 cursor-pointer hover:border-gov-green transition-all", isDarkMode && "bg-gray-800 border-gray-700")} onClick={() => navigateToService(item)}>
+                    <div className="p-2 bg-gov-bg rounded-lg text-gov-green">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-bold">{item.title}</h4>
+                      <p className="text-[10px] text-gov-text-secondary">{item.description}</p>
+                    </div>
+                    <div className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gov-text-secondary">
+                      {item.type === 'FORM' ? 'طلب' : item.type === 'INQUIRY' ? 'استعلام' : item.type === 'CALCULATOR' ? 'حاسبة' : 'تحميل'}
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-10">
+                  <Search size={40} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-gov-text-secondary">لم يتم العثور على خدمات مطابقة لبحثك</p>
+                </div>
+              )}
             </div>
-            <div className="flex-1">
-              <h3 className={cn("font-bold", isDarkMode ? "text-white" : "text-gov-text-primary")}>{item.title}</h3>
-              <p className="text-xs text-gov-text-secondary">اضغط لعرض الخدمات المتاحة</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { title: 'المؤمن عليهم', desc: 'تحديث بيانات، استعلام مدد', icon: <User size={28} />, color: 'bg-blue-50 text-blue-600', border: 'border-blue-100', cat: 'INSURED' },
+                { title: 'المتقاعدين', desc: 'حالة المعاش، إقرار حياة', icon: <Activity size={28} />, color: 'bg-green-50 text-green-600', border: 'border-green-100', cat: 'PENSIONER' },
+                { title: 'المستفيدين', desc: 'نصيب الورثة، شهادات', icon: <FileText size={28} />, color: 'bg-orange-50 text-orange-600', border: 'border-orange-100', cat: 'BENEFICIARY' },
+                { title: 'الجهات الحكومية', desc: 'رفع كشوفات، مديونية', icon: <LayoutDashboard size={28} />, color: 'bg-purple-50 text-purple-600', border: 'border-purple-100', cat: 'GOV_AGENCY' },
+                { title: 'الزوار', desc: 'حاسبة، نماذج، فروع', icon: <Info size={28} />, color: 'bg-gray-50 text-gray-600', border: 'border-gray-200', cat: 'VISITOR' },
+              ].map((item, idx) => (
+                <Card key={idx} className={cn(
+                  "flex flex-col items-center text-center gap-2 cursor-pointer hover:shadow-md transition-all p-4 border-2", 
+                  isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : `bg-white ${item.border}`
+                )} onClick={() => navigateToCategory(item.cat as ServiceCategory)}>
+                  <div className={cn('p-4 rounded-full mb-1', item.color)}>
+                    {item.icon}
+                  </div>
+                  <h3 className={cn("font-bold text-sm", isDarkMode ? "text-white" : "text-gov-text-primary")}>{item.title}</h3>
+                  <p className="text-[10px] text-gov-text-secondary leading-tight">{item.desc}</p>
+                </Card>
+              ))}
             </div>
-            <ChevronLeft size={20} className="text-gray-300" />
-          </Card>
-        ))}
-      </div>
-    </PageWrapper>
-  );
+          )}
+        </div>
+      </PageWrapper>
+    );
+  };
 
   const ServiceCategoryDetailScreen = () => {
     if (!selectedCategory) return null;
@@ -533,41 +630,168 @@ export default function App() {
       );
     }
 
-    return (
-      <PageWrapper title={selectedService.title}>
-        <div className="space-y-5">
-          <Card className={cn("bg-gov-bg border-none", isDarkMode && "bg-gray-800")}>
-            <p className="text-xs text-gov-text-secondary leading-relaxed">
-              يرجى ملء كافة الحقول المطلوبة أدناه لضمان معالجة طلبك بأسرع وقت ممكن.
-            </p>
-          </Card>
+    const renderDynamicFields = () => {
+      switch (selectedService.id) {
+        // --- INSURED SERVICES ---
+        case 'ins_1': // Update Data
+          return (
+            <>
+              <Input label="رقم الهاتف الجديد" placeholder="7XX XXX XXX" onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+              <Input label="العنوان الحالي" placeholder="المحافظة - المديرية - الشارع" onChange={(e) => setFormData({...formData, address: e.target.value})} />
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold">الحالة الاجتماعية</label>
+                <select className="px-4 py-2 rounded-gov border border-gray-300 bg-white focus:outline-none focus:border-gov-green">
+                  <option>أعزب</option>
+                  <option>متزوج</option>
+                  <option>مطلق</option>
+                  <option>أرمل</option>
+                </select>
+              </div>
+            </>
+          );
+        case 'ins_2': // Service Duration Inquiry
+          return (
+            <>
+              <Input label="الرقم التأميني" defaultValue={user.insuranceNumber} readOnly className="bg-gray-50" />
+              <Input label="رقم البطاقة الشخصية" placeholder="أدخل الرقم الوطني" onChange={(e) => setFormData({...formData, idNumber: e.target.value})} />
+            </>
+          );
+        case 'ins_3': // Service Certificate
+          return (
+            <>
+              <Input label="الجهة الموجه إليها الشهادة" placeholder="اسم الجهة الطالبة للشهادة" onChange={(e) => setFormData({...formData, entity: e.target.value})} />
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold">الغرض من الشهادة</label>
+                <textarea className="px-4 py-2 rounded-gov border border-gray-300 bg-white min-h-[80px]" placeholder="اكتب الغرض هنا..." />
+              </div>
+            </>
+          );
+        case 'ins_4': // Subscriptions Inquiry
+          return (
+            <>
+              <Input label="الرقم التأميني" defaultValue={user.insuranceNumber} readOnly className="bg-gray-50" />
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold">سنة الاستعلام</label>
+                <select className="px-4 py-2 rounded-gov border border-gray-300 bg-white focus:outline-none focus:border-gov-green">
+                  <option>2024</option>
+                  <option>2023</option>
+                  <option>2022</option>
+                  <option>جميع السنوات</option>
+                </select>
+              </div>
+            </>
+          );
 
-          <div className="space-y-4">
-            {selectedService.type === 'FORM' && (
+        // --- PENSIONER SERVICES ---
+        case 'pen_1': // Pension Status Inquiry
+          return (
+            <>
+              <Input label="رقم المعاش / الرقم التأميني" placeholder="أدخل رقم المعاش" onChange={(e) => setFormData({...formData, pensionId: e.target.value})} />
+              <Input label="شهر الاستعلام" type="month" onChange={(e) => setFormData({...formData, month: e.target.value})} />
+            </>
+          );
+        case 'pen_2': // Update Bank Account
+          return (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-semibold">اسم البنك / جهة الصرف</label>
+                <select className="px-4 py-2 rounded-gov border border-gray-300 bg-white focus:outline-none focus:border-gov-green">
+                  <option>بنك الكريمي</option>
+                  <option>البريد اليمني</option>
+                  <option>بنك التضامن</option>
+                  <option>بنك اليمن والكويت</option>
+                </select>
+              </div>
+              <Input label="رقم الحساب الجديد" placeholder="أدخل رقم الحساب المكون من 12-16 رقم" onChange={(e) => setFormData({...formData, accNumber: e.target.value})} />
+              <div className="space-y-2 mt-2">
+                <label className="text-sm font-semibold">مرفق إثبات الحساب (بطاقة البنك أو إفادة)</label>
+                <div className="border-2 border-dashed border-gray-200 rounded-gov p-4 text-center bg-gray-50 cursor-pointer">
+                  <Upload size={20} className="mx-auto text-gray-400 mb-1" />
+                  <p className="text-[10px] text-gov-text-secondary">اضغط لرفع الملف</p>
+                </div>
+              </div>
+            </>
+          );
+        case 'pen_3': // Annual Life Declaration
+          return (
+            <>
+              <Card className="bg-orange-50 border-orange-200 mb-4">
+                <p className="text-xs text-orange-800 leading-relaxed">
+                  إقرار الحياة السنوي إلزامي لاستمرار صرف المعاش. يرجى إرفاق صورة حديثة لك مع بطاقة الهوية.
+                </p>
+              </Card>
+              <Input label="رقم الهاتف الحالي" defaultValue={user.phone} />
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">التقاط / رفع صورة حديثة مع الهوية</label>
+                <div className="border-2 border-dashed border-gov-green/50 rounded-gov p-6 text-center bg-green-50 cursor-pointer hover:bg-green-100 transition-colors">
+                  <User size={32} className="mx-auto text-gov-green mb-2" />
+                  <p className="text-xs font-bold text-gov-green">اضغط لفتح الكاميرا أو رفع صورة</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 mt-4">
+                <input type="checkbox" id="declare" className="mt-1" />
+                <label htmlFor="declare" className="text-xs text-gov-text-primary leading-relaxed">
+                  أقر أنا المذكور أعلاه بصحة البيانات المرفقة وبأنني على قيد الحياة حتى تاريخ تقديم هذا الإقرار، وأتحمل المسؤولية القانونية في حال ثبوت عكس ذلك.
+                </label>
+              </div>
+            </>
+          );
+
+        // --- BENEFICIARY SERVICES ---
+        case 'ben_1': // Heirs Share Inquiry
+          return (
+            <>
+              <Input label="الرقم التأميني للمورث (المتوفي)" placeholder="أدخل رقم المورث" />
+              <Input label="رقم هوية المستعلم" placeholder="أدخل رقم هويتك" />
+            </>
+          );
+
+        // --- GOV AGENCY SERVICES ---
+        case 'gov_1': // Upload Subscriptions
+          return (
+            <>
+              <Input label="رقم جهة العمل" placeholder="أدخل رقم الجهة" />
+              <Input label="عن شهر" type="month" />
+              <div className="space-y-2 mt-2">
+                <label className="text-sm font-semibold">ملف الكشوفات (Excel / CSV)</label>
+                <div className="border-2 border-dashed border-gray-200 rounded-gov p-6 text-center bg-gray-50 cursor-pointer">
+                  <Upload size={24} className="mx-auto text-gray-400 mb-1" />
+                  <p className="text-[10px] text-gov-text-secondary">اسحب ملف الإكسل هنا</p>
+                </div>
+              </div>
+            </>
+          );
+        case 'gov_2': // Agency Debt Inquiry
+          return (
+            <>
+              <Input label="رقم جهة العمل" placeholder="أدخل رقم الجهة" />
+              <Input label="كلمة المرور الخاصة بالجهة" type="password" placeholder="***" />
+            </>
+          );
+
+        // --- DEFAULT FALLBACKS ---
+        default:
+          if (selectedService.type === 'FORM') {
+            return (
               <>
-                <Input label="الرقم التأميني" defaultValue={user.insuranceNumber} readOnly className="bg-gray-50" />
-                <Input label="رقم الهاتف للتواصل" defaultValue={user.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                <Input label="الرقم التأميني / الهوية" defaultValue={user.insuranceNumber} />
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-semibold">تفاصيل الطلب</label>
-                  <textarea 
-                    className="px-4 py-2 rounded-gov border border-gray-300 bg-white focus:outline-none focus:border-gov-green min-h-[100px]"
-                    placeholder="اكتب تفاصيل إضافية هنا..."
-                    onChange={(e) => setFormData({...formData, details: e.target.value})}
-                  />
+                  <textarea className="px-4 py-2 rounded-gov border border-gray-300 bg-white min-h-[100px]" placeholder="اكتب التفاصيل..." />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold">المرفقات (اختياري)</label>
-                  <div className="border-2 border-dashed border-gray-200 rounded-gov p-6 text-center bg-gray-50 cursor-pointer">
-                    <Upload size={24} className="mx-auto text-gray-400 mb-1" />
-                    <p className="text-[10px] text-gov-text-secondary">اسحب الملفات هنا أو اضغط للرفع</p>
+                  <label className="text-sm font-semibold">المرفقات (إن وجدت)</label>
+                  <div className="border-2 border-dashed border-gray-200 rounded-gov p-4 text-center bg-gray-50 cursor-pointer">
+                    <Upload size={20} className="mx-auto text-gray-400 mb-1" />
+                    <p className="text-[10px] text-gov-text-secondary">اضغط للرفع</p>
                   </div>
                 </div>
               </>
-            )}
-
-            {selectedService.type === 'INQUIRY' && (
+            );
+          } else if (selectedService.type === 'INQUIRY') {
+            return (
               <>
-                <Input label="رقم الهوية / الرقم التأميني" placeholder="أدخل الرقم المراد الاستعلام عنه" onChange={(e) => setFormData({...formData, id: e.target.value})} />
+                <Input label="رقم الهوية / الرقم التأميني" placeholder="أدخل الرقم المراد الاستعلام عنه" />
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-semibold">فترة الاستعلام</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -576,9 +800,9 @@ export default function App() {
                   </div>
                 </div>
               </>
-            )}
-
-            {selectedService.type === 'CALCULATOR' && (
+            );
+          } else if (selectedService.type === 'CALCULATOR') {
+            return (
               <>
                 <Input label="آخر راتب أساسي (ر.ي)" type="number" placeholder="أدخل الراتب" onChange={(e) => setFormData({...formData, salary: e.target.value})} />
                 <Input label="إجمالي سنوات الخدمة" type="number" placeholder="أدخل عدد السنوات" onChange={(e) => setFormData({...formData, years: e.target.value})} />
@@ -592,7 +816,23 @@ export default function App() {
                   </select>
                 </div>
               </>
-            )}
+            );
+          }
+          return null;
+      }
+    };
+
+    return (
+      <PageWrapper title={selectedService.title}>
+        <div className="space-y-5">
+          <Card className={cn("bg-gov-bg border-none", isDarkMode && "bg-gray-800")}>
+            <p className="text-xs text-gov-text-secondary leading-relaxed">
+              {selectedService.description}. يرجى تعبئة الحقول المطلوبة بدقة.
+            </p>
+          </Card>
+
+          <div className="space-y-4">
+            {renderDynamicFields()}
           </div>
 
           <div className="flex flex-col gap-2 pt-4">
@@ -722,6 +962,210 @@ export default function App() {
     );
   };
 
+  const ComplaintScreen = () => {
+    const [isSubmitted, setIsSubmitted] = useState(false);
+    
+    if (isSubmitted) {
+      return (
+        <PageWrapper title="تم الإرسال">
+          <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
+            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+              <CheckCircle2 size={48} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold mb-2">تم استلام شكواك</h2>
+              <p className="text-gov-text-secondary text-sm">سيتم مراجعة الشكوى والرد عليك في أقرب وقت.</p>
+            </div>
+            <Button className="w-full mt-8" onClick={() => navigate('DASHBOARD')}>العودة للرئيسية</Button>
+          </div>
+        </PageWrapper>
+      );
+    }
+
+    return (
+      <PageWrapper title="تقديم شكوى / مقترح">
+        <div className="space-y-4">
+          <Card className="bg-red-50 border-red-100">
+            <p className="text-xs text-red-800 leading-relaxed">
+              نحن نهتم بملاحظاتكم. يرجى كتابة تفاصيل الشكوى أو المقترح بوضوح ليتمكن الفريق المختص من معالجتها.
+            </p>
+          </Card>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-semibold">نوع الرسالة</label>
+            <select className="px-4 py-2 rounded-gov border border-gray-300 bg-white focus:outline-none focus:border-gov-green">
+              <option>شكوى ضد خدمة</option>
+              <option>شكوى ضد موظف</option>
+              <option>مقترح تطوير</option>
+              <option>أخرى</option>
+            </select>
+          </div>
+          <Input label="عنوان الشكوى / المقترح" placeholder="اكتب عنواناً مختصراً" />
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-semibold">التفاصيل</label>
+            <textarea className="px-4 py-2 rounded-gov border border-gray-300 bg-white min-h-[120px]" placeholder="اكتب كافة التفاصيل هنا..." />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">المرفقات (اختياري)</label>
+            <div className="border-2 border-dashed border-gray-200 rounded-gov p-4 text-center bg-gray-50 cursor-pointer">
+              <Upload size={20} className="mx-auto text-gray-400 mb-1" />
+              <p className="text-[10px] text-gov-text-secondary">اضغط لرفع صور أو مستندات داعمة</p>
+            </div>
+          </div>
+          <Button className="w-full mt-4" onClick={() => {
+            setIsLoading(true);
+            setTimeout(() => {
+              setIsLoading(false);
+              setIsSubmitted(true);
+            }, 1500);
+          }}>إرسال الشكوى</Button>
+        </div>
+      </PageWrapper>
+    );
+  };
+
+  const FAQScreen = () => {
+    const faqs = [
+      { q: 'كيف يمكنني تحديث بياناتي البنكية؟', a: 'يمكنك ذلك من خلال قسم الخدمات > خدمات المتقاعدين > تحديث بيانات الحساب البنكي، مع إرفاق صورة من بطاقة البنك.' },
+      { q: 'متى يتم صرف المعاش التقاعدي؟', a: 'يتم صرف المعاش التقاعدي عادة في الأسبوع الأول من كل شهر ميلادي.' },
+      { q: 'ما هي الأوراق المطلوبة لإقرار الحياة؟', a: 'تحتاج فقط إلى التقاط صورة حديثة لك مع بطاقة الهوية الوطنية من خلال التطبيق.' },
+      { q: 'كيف أستعلم عن نصيبي من معاش المورث؟', a: 'من خلال خدمات المستفيدين، أدخل الرقم التأميني للمورث ورقم هويتك لتظهر لك التفاصيل.' }
+    ];
+    
+    return (
+      <PageWrapper title="الأسئلة الشائعة">
+        <div className="space-y-3">
+          {faqs.map((faq, idx) => (
+            <Card key={idx} className="space-y-2">
+              <h3 className="font-bold text-sm text-gov-green flex items-start gap-2">
+                <HelpCircle size={18} className="shrink-0 mt-0.5" />
+                {faq.q}
+              </h3>
+              <p className="text-xs text-gov-text-secondary leading-relaxed pl-6 border-r-2 border-gray-100 mr-2 pr-4">{faq.a}</p>
+            </Card>
+          ))}
+        </div>
+      </PageWrapper>
+    );
+  };
+
+  const LawsScreen = () => {
+    const laws = [
+      { id: 1, title: 'قانون التأمينات والمعاشات رقم (25) لسنة 1991', size: '2.4 MB', date: '1991' },
+      { id: 2, title: 'اللائحة التنفيذية لقانون التأمينات', size: '1.8 MB', date: '1992' },
+      { id: 3, title: 'قانون التأمينات الاجتماعية للقطاع الخاص', size: '3.1 MB', date: '2000' },
+    ];
+    
+    return (
+      <PageWrapper title="قوانين وتشريعات">
+        <div className="space-y-3">
+          {laws.map(law => (
+            <Card key={law.id} className="flex items-center gap-4">
+              <div className="p-3 bg-teal-50 text-teal-600 rounded-lg">
+                <Scale size={24} />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold">{law.title}</h4>
+                <p className="text-[10px] text-gov-text-secondary">حجم الملف: {law.size} • سنة الإصدار: {law.date}</p>
+              </div>
+              <button className="p-2 text-gov-green hover:bg-green-50 rounded-full transition-colors">
+                <Download size={20} />
+              </button>
+            </Card>
+          ))}
+        </div>
+      </PageWrapper>
+    );
+  };
+
+  const FormsScreen = () => {
+    const forms = [
+      { id: 1, title: 'استمارة نهاية الخدمة (نموذج 1)', type: 'PDF' },
+      { id: 2, title: 'استمارة طلب معاش شيخوخة', type: 'PDF' },
+      { id: 3, title: 'نموذج إقرار حالة اجتماعية', type: 'DOCX' },
+      { id: 4, title: 'استمارة حصر الورثة', type: 'PDF' },
+    ];
+    
+    return (
+      <PageWrapper title="الاستمارات والنماذج">
+        <div className="space-y-3">
+          {forms.map(form => (
+            <Card key={form.id} className="flex items-center gap-4">
+              <div className={cn("p-3 rounded-lg", form.type === 'PDF' ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600")}>
+                <FileBox size={24} />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold">{form.title}</h4>
+                <p className="text-[10px] text-gov-text-secondary">صيغة الملف: {form.type}</p>
+              </div>
+              <button className="p-2 text-gov-green hover:bg-green-50 rounded-full transition-colors">
+                <Download size={20} />
+              </button>
+            </Card>
+          ))}
+        </div>
+      </PageWrapper>
+    );
+  };
+
+  const InsuranceCalcScreen = () => {
+    const [salary, setSalary] = useState('');
+    const [result, setResult] = useState<{emp: number, gov: number, total: number} | null>(null);
+
+    const calculate = () => {
+      const s = parseFloat(salary);
+      if (isNaN(s) || s <= 0) return;
+      // Assuming standard 6% employee, 9% employer = 15% total
+      setResult({
+        emp: s * 0.06,
+        gov: s * 0.09,
+        total: s * 0.15
+      });
+    };
+
+    return (
+      <PageWrapper title="حاسبة التأمين">
+        <div className="space-y-4">
+          <Card className="bg-indigo-50 border-indigo-100">
+            <p className="text-xs text-indigo-800 leading-relaxed">
+              تساعدك هذه الحاسبة في معرفة قيمة الاشتراكات التأمينية الشهرية المستقطعة من الراتب وحصة جهة العمل.
+            </p>
+          </Card>
+          
+          <Input 
+            label="الراتب الأساسي (ر.ي)" 
+            type="number" 
+            placeholder="أدخل الراتب الأساسي" 
+            value={salary}
+            onChange={(e) => setSalary(e.target.value)}
+          />
+          
+          <Button className="w-full" onClick={calculate}>احسب الاشتراكات</Button>
+
+          {result && (
+            <Card className="border-gov-green mt-6 space-y-4">
+              <h3 className="font-bold text-center text-gov-green border-b pb-2">تفاصيل الاشتراكات الشهرية</h3>
+              
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gov-text-secondary">حصة الموظف (6%)</span>
+                <span className="font-bold">{result.emp.toFixed(2)} ر.ي</span>
+              </div>
+              
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gov-text-secondary">حصة جهة العمل (9%)</span>
+                <span className="font-bold">{result.gov.toFixed(2)} ر.ي</span>
+              </div>
+              
+              <div className="flex justify-between items-center text-sm pt-2 border-t border-dashed">
+                <span className="font-bold text-gov-green">إجمالي الاشتراك (15%)</span>
+                <span className="font-bold text-lg text-gov-green">{result.total.toFixed(2)} ر.ي</span>
+              </div>
+            </Card>
+          )}
+        </div>
+      </PageWrapper>
+    );
+  };
+
   const LoginScreen = () => (
     <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
       <div className="text-center mb-10">
@@ -814,6 +1258,27 @@ export default function App() {
           <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
         </div>
 
+        {/* Track Request Widget */}
+        <Card className="bg-white border-gov-green/20 shadow-sm">
+          <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-gov-green">
+            <Search size={18} /> تتبع معاملة / طلب
+          </h3>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="أدخل رقم الطلب (مثال: REQ-001)" 
+              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-gov-green focus:ring-1 focus:ring-gov-green outline-none"
+            />
+            <Button className="py-2 px-4 text-sm" onClick={() => {
+              setIsLoading(true);
+              setTimeout(() => {
+                setIsLoading(false);
+                alert('حالة الطلب: قيد المراجعة من قبل الإدارة المختصة.');
+              }, 1000);
+            }}>تتبع</Button>
+          </div>
+        </Card>
+
         {/* Quick Services Grid */}
         <div className="grid grid-cols-2 gap-3">
           <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('BASIC_DATA')}>
@@ -832,6 +1297,29 @@ export default function App() {
             <div className="p-3 bg-purple-50 text-purple-600 rounded-full"><Upload size={24} /></div>
             <span className="text-sm font-bold">وثائقي</span>
           </Card>
+        </div>
+
+        {/* Additional Services */}
+        <div>
+          <h3 className="font-bold text-gov-text-primary mb-3">خدمات إضافية</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('COMPLAINT')}>
+              <div className="p-2 bg-red-50 text-red-600 rounded-lg"><AlertTriangle size={20} /></div>
+              <span className="text-xs font-bold">تقديم شكوى</span>
+            </Card>
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('INSURANCE_CALC')}>
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Calculator size={20} /></div>
+              <span className="text-xs font-bold">حاسبة التأمين</span>
+            </Card>
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('LAWS')}>
+              <div className="p-2 bg-teal-50 text-teal-600 rounded-lg"><Scale size={20} /></div>
+              <span className="text-xs font-bold">قوانين وتشريعات</span>
+            </Card>
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('FORMS')}>
+              <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><FileBox size={20} /></div>
+              <span className="text-xs font-bold">النماذج</span>
+            </Card>
+          </div>
         </div>
 
         {/* Recent Requests */}
@@ -1340,6 +1828,11 @@ export default function App() {
       case 'INQUIRY_RESULT': return <InquiryResultScreen />;
       case 'DRAFTS': return <DraftsScreen />;
       case 'DOCUMENTS': return <DocumentsScreen />;
+      case 'COMPLAINT': return <ComplaintScreen />;
+      case 'FAQ': return <FAQScreen />;
+      case 'LAWS': return <LawsScreen />;
+      case 'FORMS': return <FormsScreen />;
+      case 'INSURANCE_CALC': return <InsuranceCalcScreen />;
       default: return <LoginScreen />;
     }
   };
