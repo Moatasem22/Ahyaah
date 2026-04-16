@@ -92,6 +92,7 @@ import {
   type AppNotification 
 } from './lib/notifications';
 import Splash from './components/Splash';
+import { FileUpload } from './components/FileUpload';
 
 // --- Utility ---
 function cn(...inputs: ClassValue[]) {
@@ -128,6 +129,7 @@ type Screen =
   | 'COMPLAINT_TRACKING'
   | 'GAZETTES'
   | 'MAIN_MENU'
+  | 'DOCUMENTS_UPLOAD'
   | 'NOTIFICATIONS';
 
 type ServiceCategory = 
@@ -729,6 +731,7 @@ export default function App() {
                 { label: 'الرئيسية', icon: <Home size={20} />, screen: 'DASHBOARD' },
                 { label: 'الملف الشخصي', icon: <User size={20} />, screen: 'PROFILE' },
                 { label: 'طلباتي', icon: <FileText size={20} />, screen: 'REQUESTS' },
+                { label: 'رفع المستندات', icon: <Upload size={20} />, screen: 'DOCUMENTS_UPLOAD' },
                 { label: 'الإعدادات', icon: <Settings size={20} />, screen: 'SETTINGS' },
                 { label: 'عن الهيئة', icon: <Info size={20} />, screen: 'ABOUT' },
               ].map((item, idx) => (
@@ -2920,6 +2923,19 @@ export default function App() {
     </PageWrapper>
   );
 
+  const DocumentsUploadScreen = () => (
+    <PageWrapper title="رفع المستندات">
+      <div className="space-y-6">
+        <Card className="bg-gov-bg border-none">
+          <p className="text-xs text-gov-text-secondary leading-relaxed">
+            يرجى رفع صور واضحة للمستندات المطلوبة (البطاقة الشخصية، شهادة الميلاد، إلخ). يمكنك سحب الملفات وإفلاتها مباشرة.
+          </p>
+        </Card>
+        <FileUpload />
+      </div>
+    </PageWrapper>
+  );
+
   const renderScreen = () => {
     switch (screen) {
       case 'ABOUT': return <AboutScreen />;
@@ -2949,6 +2965,7 @@ export default function App() {
       case 'INSURANCE_CALC': return <InsuranceCalcScreen />;
       case 'COMPLAINT_TRACKING': return <ComplaintTrackingScreen />;
       case 'GAZETTES': return <GazetteScreen />;
+      case 'DOCUMENTS_UPLOAD': return <DocumentsUploadScreen />;
       case 'MAIN_MENU': return <MainMenuScreen />;
       case 'NOTIFICATIONS': return <NotificationCenterScreen />;
       default: return <LoginScreen />;
