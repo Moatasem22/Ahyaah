@@ -15,6 +15,11 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Serve Service Worker explicitly to avoid redirects
+  app.get("/service-worker.js", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "service-worker.js"));
+  });
+
   // API Routes
   
   // Verify Employee Status (Hypothetical Gov API)

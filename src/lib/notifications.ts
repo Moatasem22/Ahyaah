@@ -30,7 +30,10 @@ export const requestNotificationPermission = async () => {
 export const registerServiceWorker = async () => {
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
+      // Use a relative path to avoid root-level redirect issues
+      // and a different filename to bypass potential cached redirects
+      const swUrl = 'service-worker.js';
+      const registration = await navigator.serviceWorker.register(swUrl, { scope: './' });
       console.log('Service Worker registered with scope:', registration.scope);
       return registration;
     } catch (error) {
