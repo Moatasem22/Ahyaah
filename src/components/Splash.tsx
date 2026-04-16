@@ -9,12 +9,19 @@ const Splash: React.FC<SplashProps> = ({ onFinish }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const hideTimer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onFinish, 500); // Wait for exit animation
     }, 3000);
 
-    return () => clearTimeout(timer);
+    // Safety fallback: always call onFinish after 4s even if animation fails
+    const finishTimer = setTimeout(() => {
+      onFinish();
+    }, 4000);
+
+    return () => {
+      clearTimeout(hideTimer);
+      clearTimeout(finishTimer);
+    };
   }, [onFinish]);
 
   return (
@@ -23,6 +30,11 @@ const Splash: React.FC<SplashProps> = ({ onFinish }) => {
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          onAnimationComplete={(definition) => {
+            if (definition === 'exit' || (definition as any)?.opacity === 0) {
+              onFinish();
+            }
+          }}
           className="fixed inset-0 z-[9999] bg-white flex flex-col items-center justify-center p-6 text-center"
         >
           <motion.div
@@ -32,12 +44,10 @@ const Splash: React.FC<SplashProps> = ({ onFinish }) => {
             className="mb-8"
           >
             <div className="w-32 h-32 bg-gov-green/10 rounded-full flex items-center justify-center mb-4 shadow-xl shadow-gov-green/5 border border-gov-green/20">
-              <img 
-                src="https://picsum.photos/seed/yemen-logo/400/400" 
-                alt="Authority Logo" 
-                className="w-24 h-24 object-contain"
-                referrerPolicy="no-referrer"
-              />
+              <svg viewBox="0 0 100 100" className="w-24 h-24" xmlns="http://www.w3.org/2000/svg">
+                <rect width="100" height="100" rx="50" fill="#1B5E20"/>
+                <text y=".85em" x=".1em" fontSize="70">🇾🇪</text>
+              </svg>
             </div>
           </motion.div>
 
