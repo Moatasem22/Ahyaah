@@ -180,10 +180,10 @@ const Button = ({
   ...props 
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' }) => {
   const variants = {
-    primary: 'bg-gov-green text-white hover:bg-opacity-90',
-    secondary: 'bg-gov-text-secondary text-white hover:bg-opacity-90',
-    outline: 'border border-gov-green text-gov-green hover:bg-gov-green hover:text-white',
-    ghost: 'text-gov-text-secondary hover:bg-gray-100',
+    primary: 'bg-gov-green text-white hover:bg-opacity-90 shadow-md',
+    secondary: 'bg-gray-600 text-white hover:bg-opacity-90',
+    outline: 'border-2 border-gov-green text-gov-green hover:bg-gov-green hover:text-white',
+    ghost: 'text-gov-text-secondary hover:bg-gray-100 dark:hover:bg-gray-800',
     danger: 'bg-gov-error text-white hover:bg-opacity-90',
   };
 
@@ -203,7 +203,9 @@ const Button = ({
 
 const Card = ({ children, className, ...props }: { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn(
-    'bg-white p-5 rounded-2xl shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-gray-100/80 transition-all duration-300 hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.1)] hover:-translate-y-0.5', 
+    'p-5 rounded-2xl shadow-lg border transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5', 
+    'bg-white border-gray-100 text-gov-text-primary',
+    'dark:bg-gray-800 dark:border-gray-700 dark:text-white',
     className
   )} {...props}>
     {children}
@@ -243,7 +245,7 @@ const ServiceCard: React.FC<{ item: ServiceItem; onClick: () => void; isDarkMode
   </Card>
 );
 
-const NewsTicker = () => {
+const NewsTicker = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [news, setNews] = useState<string[]>([]);
 
   useEffect(() => {
@@ -257,7 +259,10 @@ const NewsTicker = () => {
   }, []);
 
   return (
-    <div className="bg-gov-green text-white text-[10px] flex items-center overflow-hidden relative h-9 shadow-md border-b border-white/10">
+    <div className={cn(
+      "text-white text-[10px] flex items-center overflow-hidden relative h-9 shadow-md border-b",
+      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gov-green border-white/10"
+    )}>
       <div className="bg-red-600 text-white px-3 flex items-center gap-1.5 z-20 absolute right-0 h-full shadow-[-4px_0_12px_rgba(0,0,0,0.3)] font-black italic tracking-wider">
         <motion.div
           animate={{ scale: [1, 1.2, 1] }}
@@ -286,11 +291,13 @@ const NewsTicker = () => {
 
 const Input = ({ label, error, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string }) => (
   <div className="flex flex-col gap-1 w-full">
-    {label && <label className="text-sm font-semibold text-gov-text-primary">{label}</label>}
+    {label && <label className="text-sm font-semibold opacity-90">{label}</label>}
     <input 
       className={cn(
-        'px-4 py-2 rounded-gov border border-gray-300 focus:outline-none focus:border-gov-green transition-colors bg-white',
-        error && 'border-gov-error',
+        'px-4 py-2 rounded-gov border transition-colors outline-none',
+        'bg-white border-gray-300 text-gov-text-primary focus:border-gov-green',
+        'dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:border-gov-green',
+        error && 'border-gov-error dark:border-gov-error',
         props.className
       )}
       {...props}
@@ -307,7 +314,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [language, setLanguage] = useState<'AR' | 'EN'>('AR');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [notificationSettings, setNotificationSettings] = useState({
@@ -516,7 +523,7 @@ export default function App() {
   const PageWrapper = ({ children, title, showBack = true, showNav = true }: { children: React.ReactNode; title: string; showBack?: boolean; showNav?: boolean }) => (
     <div className={cn(
       "min-h-screen flex flex-col max-w-md mx-auto relative overflow-hidden transition-colors duration-300",
-      isDarkMode ? "bg-gray-900 text-white" : "bg-gov-bg text-gov-text-primary"
+      isDarkMode ? "bg-gray-950 text-white dark" : "bg-gov-bg text-gov-text-primary"
     )}>
       {/* Loading Overlay */}
       <AnimatePresence>
@@ -525,7 +532,10 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center"
+            className={cn(
+              "absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center",
+              isDarkMode ? "bg-black/60" : "bg-white/80"
+            )}
           >
             <RefreshCw className="text-gov-green animate-spin mb-2" size={40} />
             <p className="text-gov-green font-bold">جاري التحميل...</p>
@@ -534,7 +544,10 @@ export default function App() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="bg-gov-green text-white p-4 flex items-center justify-between sticky top-0 z-50 shadow-md">
+      <header className={cn(
+        "p-4 flex items-center justify-between sticky top-0 z-50 shadow-lg transition-colors",
+        isDarkMode ? "bg-gray-900 border-b border-gray-800" : "bg-gov-green text-white"
+      )}>
         <div className="flex items-center gap-3">
           {showBack && (
             <button onClick={() => window.history.back()} className="p-1 hover:bg-white/10 rounded-full transition-colors">
@@ -571,7 +584,7 @@ export default function App() {
       </header>
 
       {/* News Ticker */}
-      <NewsTicker />
+      <NewsTicker isDarkMode={isDarkMode} />
 
       {/* Content */}
       <main className="flex-1 p-4 pb-24 overflow-y-auto">
@@ -1797,12 +1810,18 @@ export default function App() {
     };
 
     return (
-      <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
+      <div className={cn(
+        "min-h-screen flex flex-col max-w-md mx-auto p-6 justify-center transition-colors",
+        isDarkMode ? "bg-gray-950 text-white" : "bg-white text-gov-text-primary"
+      )}>
         <div className="text-center mb-10">
-          <div className="w-24 h-24 bg-gov-green/10 rounded-full mx-auto mb-4 flex items-center justify-center">
+          <div className={cn(
+            "w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center",
+            isDarkMode ? "bg-gov-green/20" : "bg-gov-green/10"
+          )}>
             <img src="https://picsum.photos/seed/yemen-logo/200/200" alt="Authority Logo" className="w-16 h-16 object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-gov-green">الهيئة العامة للتأمينات والمعاشات</h1>
+          <h1 className={cn("text-2xl font-bold", isDarkMode ? "text-gov-green" : "text-gov-green")}>الهيئة العامة للتأمينات والمعاشات</h1>
           <p className="text-gov-text-secondary">فرع تَعِز - الجمهورية اليمنية</p>
         </div>
 
@@ -1859,7 +1878,10 @@ export default function App() {
   };
 
   const RegisterScreen = () => (
-    <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6">
+    <div className={cn(
+      "min-h-screen flex flex-col max-w-md mx-auto p-6 transition-colors",
+      isDarkMode ? "bg-gray-950 text-white" : "bg-white text-gov-text-primary"
+    )}>
       <div className="flex items-center gap-2 mb-8">
         <button onClick={() => navigate('LOGIN')} className="p-1"><ChevronRight size={24} /></button>
         <h1 className="text-xl font-bold text-gov-green">إنشاء حساب جديد</h1>
@@ -1891,7 +1913,10 @@ export default function App() {
     <PageWrapper title="لوحة التحكم" showBack={false}>
       <div className="space-y-6">
         {/* Welcome Card */}
-        <div className="bg-gov-green text-white p-6 rounded-gov shadow-lg relative overflow-hidden">
+        <div className={cn(
+          "p-6 rounded-gov shadow-lg relative overflow-hidden transition-colors",
+          isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gov-green text-white"
+        )}>
           <div className="relative z-10">
             <p className="text-sm opacity-80">مرحباً بك،</p>
             <h2 className="text-xl font-bold mb-4">{user.name}</h2>
@@ -1909,11 +1934,14 @@ export default function App() {
               </div>
             </div>
           </div>
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+          <div className={cn(
+            "absolute -bottom-10 -left-10 w-40 h-40 rounded-full blur-3xl",
+            isDarkMode ? "bg-gov-green/20" : "bg-white/10"
+          )} />
         </div>
 
         {/* Track Request Widget */}
-        <Card className="bg-white border-gov-green/20 shadow-sm">
+        <Card className="shadow-sm">
           <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-gov-green">
             <Search size={18} /> تتبع معاملة / طلب
           </h3>
@@ -1921,7 +1949,12 @@ export default function App() {
             <input 
               type="text" 
               placeholder="أدخل رقم الطلب (مثال: REQ-001)" 
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-gov-green focus:ring-1 focus:ring-gov-green outline-none"
+              className={cn(
+                "flex-1 px-3 py-2 rounded-lg border text-sm outline-none transition-colors",
+                isDarkMode 
+                  ? "bg-gray-900 border-gray-700 text-white focus:border-gov-green" 
+                  : "bg-white border-gray-200 text-gov-text-primary focus:border-gov-green"
+              )}
             />
             <Button className="py-2 px-4 text-sm" onClick={() => {
               setIsLoading(true);
@@ -1936,45 +1969,45 @@ export default function App() {
         {/* Quick Services Grid */}
         <div className="grid grid-cols-2 gap-3">
           <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('BASIC_DATA')}>
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-full"><User size={24} /></div>
+            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-600")}><User size={24} /></div>
             <span className="text-sm font-bold">بياناتي</span>
           </Card>
           <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('REQUESTS')}>
-            <div className="p-3 bg-green-50 text-green-600 rounded-full"><FileText size={24} /></div>
+            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-green-900/30 text-green-400" : "bg-green-50 text-green-600")}><FileText size={24} /></div>
             <span className="text-sm font-bold">طلباتي</span>
           </Card>
           <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('DRAFTS')}>
-            <div className="p-3 bg-orange-50 text-orange-600 rounded-full"><Edit2 size={24} /></div>
+            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-orange-900/30 text-orange-400" : "bg-orange-50 text-orange-600")}><Edit2 size={24} /></div>
             <span className="text-sm font-bold">المسودات</span>
           </Card>
           <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('DOCUMENTS')}>
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-full"><Upload size={24} /></div>
+            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-purple-900/30 text-purple-400" : "bg-purple-50 text-purple-600")}><Upload size={24} /></div>
             <span className="text-sm font-bold">وثائقي</span>
           </Card>
           <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('ABOUT')}>
-            <div className="p-3 bg-teal-50 text-teal-600 rounded-full"><Info size={24} /></div>
+            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-teal-900/30 text-teal-400" : "bg-teal-50 text-teal-600")}><Info size={24} /></div>
             <span className="text-sm font-bold">عن الهيئة</span>
           </Card>
         </div>
 
         {/* Additional Services */}
         <div>
-          <h3 className="font-bold text-gov-text-primary mb-3">خدمات إضافية</h3>
+          <h3 className={cn("font-bold mb-3", isDarkMode ? "text-white" : "text-gov-text-primary")}>خدمات إضافية</h3>
           <div className="grid grid-cols-2 gap-3">
             <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('COMPLAINT_TRACKING')}>
-              <div className="p-2 bg-red-50 text-red-600 rounded-lg"><MessageSquare size={20} /></div>
+              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-red-900/30 text-red-400" : "bg-red-50 text-red-600")}><MessageSquare size={20} /></div>
               <span className="text-xs font-bold">تتبع الشكاوى</span>
             </Card>
             <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('INSURANCE_CALC')}>
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Calculator size={20} /></div>
+              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-indigo-900/30 text-indigo-400" : "bg-indigo-50 text-indigo-600")}><Calculator size={20} /></div>
               <span className="text-xs font-bold">حاسبة التأمين</span>
             </Card>
             <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('LAWS')}>
-              <div className="p-2 bg-teal-50 text-teal-600 rounded-lg"><Scale size={20} /></div>
+              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-teal-900/30 text-teal-400" : "bg-teal-50 text-teal-600")}><Scale size={20} /></div>
               <span className="text-xs font-bold">قوانين وتشريعات</span>
             </Card>
             <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('FORMS')}>
-              <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><FileBox size={20} /></div>
+              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-yellow-900/30 text-yellow-400" : "bg-yellow-50 text-yellow-600")}><FileBox size={20} /></div>
               <span className="text-xs font-bold">النماذج</span>
             </Card>
           </div>
@@ -1983,7 +2016,7 @@ export default function App() {
         {/* Recent Requests */}
         <div>
           <div className="flex justify-between items-center mb-3">
-            <h3 className="font-bold text-gov-text-primary">الطلبات الأخيرة</h3>
+            <h3 className={cn("font-bold", isDarkMode ? "text-white" : "text-gov-text-primary")}>الطلبات الأخيرة</h3>
             <button onClick={() => navigate('REQUESTS')} className="text-xs text-gov-link">عرض الكل</button>
           </div>
           <div className="space-y-2">
@@ -1992,8 +2025,9 @@ export default function App() {
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'p-2 rounded-full',
-                    req.status === 'APPROVED' ? 'bg-green-50 text-green-600' : 
-                    req.status === 'PENDING' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
+                    req.status === 'APPROVED' ? (isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-600') : 
+                    req.status === 'PENDING' ? (isDarkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-50 text-orange-600') : 
+                    (isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-600')
                   )}>
                     {req.status === 'APPROVED' ? <CheckCircle2 size={16} /> : req.status === 'PENDING' ? <Clock size={16} /> : <XCircle size={16} />}
                   </div>
@@ -2025,14 +2059,20 @@ export default function App() {
   const BasicDataScreen = () => (
     <PageWrapper title="البيانات الأساسية">
       <div className="space-y-4">
-        <Card className={cn("text-center py-8 relative overflow-hidden", isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100")}>
+        <Card className="text-center py-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-gov-green/5 rounded-bl-full -mr-10 -mt-10" />
-          <div className="w-24 h-24 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg relative z-10">
+          <div className={cn(
+            "w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-4 shadow-lg relative z-10",
+            isDarkMode ? "bg-gray-700 border-gray-900" : "bg-gray-100 border-white"
+          )}>
             <img src={user.avatar} alt="User" className="w-full h-full object-cover" />
           </div>
           <h2 className="text-xl font-bold relative z-10">{user.name}</h2>
           <p className="text-sm text-gov-text-secondary font-mono relative z-10">{user.insuranceNumber}</p>
-          <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 bg-green-50 text-green-700 text-xs rounded-full font-bold border border-green-100 relative z-10">
+          <div className={cn(
+            "mt-4 inline-flex items-center gap-2 px-4 py-1.5 text-xs rounded-full font-bold border relative z-10",
+            isDarkMode ? "bg-green-900/30 text-green-400 border-green-900/50" : "bg-green-50 text-green-700 border-green-100"
+          )}>
             <CheckCircle2 size={14} />
             الحالة: {user.status}
           </div>
@@ -2045,11 +2085,8 @@ export default function App() {
             { label: 'رقم الهاتف الجوال', value: user.phone, icon: <Activity size={18} className="text-green-500" /> },
             { label: 'عنوان السكن الحالي', value: user.address, icon: <Home size={18} className="text-purple-500" /> },
           ].map((item, idx) => (
-            <Card key={idx} className={cn(
-              "flex items-center gap-4 p-4",
-              isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"
-            )}>
-              <div className="p-2 bg-gray-50 rounded-lg">
+            <Card key={idx} className="flex items-center gap-4 p-4">
+              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-gray-900" : "bg-gray-50")}>
                 {item.icon}
               </div>
               <div className="flex-1">
@@ -2084,7 +2121,7 @@ export default function App() {
   const SubscriptionsScreen = () => (
     <PageWrapper title="سجل الاشتراكات">
       <div className="space-y-4">
-        <Card className={cn("bg-gov-green text-white", isDarkMode && "bg-gov-green/80")}>
+        <Card className={cn("bg-gov-green text-white border-none shadow-gov-green/20")}>
           <p className="text-xs opacity-80">إجمالي الاشتراكات النشطة</p>
           <h2 className="text-2xl font-bold">14,500 ر.ي</h2>
           <p className="text-[10px] mt-2">آخر تحديث: {new Date().toLocaleDateString('ar-YE')}</p>
@@ -2093,14 +2130,17 @@ export default function App() {
         <div className="space-y-3">
           <h3 className="font-bold text-sm">تفاصيل الدفعات</h3>
           {subscriptions.map((sub) => (
-            <Card key={sub.id} className={cn("flex justify-between items-center", isDarkMode && "bg-gray-800 border-gray-700")}>
+            <Card key={sub.id} className="flex justify-between items-center">
               <div>
                 <p className="text-sm font-bold">{sub.period}</p>
                 <p className="text-[10px] text-gov-text-secondary">رقم العملية: {sub.id}</p>
               </div>
               <div className="text-left">
                 <p className="text-sm font-bold text-gov-green">{sub.amount}</p>
-                <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full">ناجحة</span>
+                <span className={cn(
+                  "text-[10px] px-2 py-0.5 rounded-full",
+                  isDarkMode ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700"
+                )}>ناجحة</span>
               </div>
             </Card>
           ))}
@@ -2113,7 +2153,7 @@ export default function App() {
     <PageWrapper title="الجهات الحكومية">
       <div className="space-y-4">
         {govAgencies.map((agency) => (
-          <Card key={agency.id} className={cn("space-y-3", isDarkMode && "bg-gray-800 border-gray-700")}>
+          <Card key={agency.id} className="space-y-3">
             <div className="flex justify-between items-start">
               <h3 className="font-bold text-gov-green">{agency.name}</h3>
               <a href={agency.link} target="_blank" rel="noreferrer" className="text-gov-link text-xs flex items-center gap-1">
@@ -2124,11 +2164,14 @@ export default function App() {
               <Home size={16} />
               <span>{agency.contact}</span>
             </div>
-            <div className="pt-2 border-t border-gray-100">
+            <div className={cn("pt-2 border-t", isDarkMode ? "border-gray-700" : "border-gray-100")}>
               <p className="text-xs font-bold mb-2">الخدمات المتاحة:</p>
               <div className="flex flex-wrap gap-2">
                 {agency.services.map((service, i) => (
-                  <span key={i} className="text-[10px] px-2 py-1 bg-gray-100 rounded-full text-gov-text-primary">
+                  <span key={i} className={cn(
+                    "text-[10px] px-2 py-1 rounded-full",
+                    isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gov-text-primary"
+                  )}>
                     {service}
                   </span>
                 ))}
