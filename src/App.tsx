@@ -2814,10 +2814,12 @@ export default function App() {
 
   return (
     <>
-      {showSplash && <Splash onFinish={() => setShowSplash(false)} />}
-      <AnimatePresence mode="wait">
-        {renderScreen()}
-      </AnimatePresence>
+      <Splash onFinish={() => setShowSplash(false)} />
+      {!showSplash && (
+        <AnimatePresence mode="wait">
+          {renderScreen()}
+        </AnimatePresence>
+      )}
     </>
   );
 }
