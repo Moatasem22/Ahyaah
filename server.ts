@@ -13,17 +13,6 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Serve static files from public directory first
-  app.use(express.static(path.join(process.cwd(), "public"), {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith("service-worker.js")) {
-        res.setHeader("Service-Worker-Allowed", "/");
-        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-        res.setHeader("Content-Type", "application/javascript");
-      }
-    }
-  }));
-
   app.use(express.json());
 
   // API Routes

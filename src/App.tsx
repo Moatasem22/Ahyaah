@@ -27,7 +27,6 @@ import {
   CreditCard,
   Activity,
   ChevronRight,
-  Check,
   Upload,
   Menu,
   Search,
@@ -2397,18 +2396,9 @@ export default function App() {
       <div className="space-y-4">
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
           <button className="px-4 py-1.5 bg-gov-green text-white rounded-full text-xs whitespace-nowrap">الكل</button>
-          <button className={cn(
-            "px-4 py-1.5 border rounded-full text-xs whitespace-nowrap",
-            isDarkMode ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gov-text-secondary"
-          )}>قيد المراجعة</button>
-          <button className={cn(
-            "px-4 py-1.5 border rounded-full text-xs whitespace-nowrap",
-            isDarkMode ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gov-text-secondary"
-          )}>موافق عليه</button>
-          <button className={cn(
-            "px-4 py-1.5 border rounded-full text-xs whitespace-nowrap",
-            isDarkMode ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gov-text-secondary"
-          )}>مرفوض</button>
+          <button className="px-4 py-1.5 bg-white border border-gray-200 text-gov-text-secondary rounded-full text-xs whitespace-nowrap">قيد المراجعة</button>
+          <button className="px-4 py-1.5 bg-white border border-gray-200 text-gov-text-secondary rounded-full text-xs whitespace-nowrap">موافق عليه</button>
+          <button className="px-4 py-1.5 bg-white border border-gray-200 text-gov-text-secondary rounded-full text-xs whitespace-nowrap">مرفوض</button>
         </div>
 
         <div className="space-y-3">
@@ -2418,9 +2408,8 @@ export default function App() {
                 <h3 className="font-bold text-sm">{req.type}</h3>
                 <span className={cn(
                   'text-[10px] px-2 py-0.5 rounded-full font-bold',
-                  req.status === 'APPROVED' ? (isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') : 
-                  req.status === 'PENDING' ? (isDarkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-700') : 
-                  (isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')
+                  req.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                  req.status === 'PENDING' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
                 )}>
                   {req.status === 'APPROVED' ? 'موافق عليه' : req.status === 'PENDING' ? 'قيد المراجعة' : 'مرفوض'}
                 </span>
@@ -2520,9 +2509,8 @@ export default function App() {
               <h2 className="font-bold text-gov-green">{selectedRequest.type}</h2>
               <span className={cn(
                 'text-[10px] px-2 py-0.5 rounded-full font-bold',
-                selectedRequest.status === 'APPROVED' ? (isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') : 
-                selectedRequest.status === 'PENDING' ? (isDarkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-700') : 
-                (isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')
+                selectedRequest.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                selectedRequest.status === 'PENDING' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
               )}>
                 {selectedRequest.status === 'APPROVED' ? 'موافق عليه' : selectedRequest.status === 'PENDING' ? 'قيد المراجعة' : 'مرفوض'}
               </span>
@@ -2537,7 +2525,7 @@ export default function App() {
                 <span className="text-gov-text-secondary">تاريخ التقديم</span>
                 <span>{selectedRequest.date}</span>
               </div>
-              <div className={cn("pt-2 border-t", isDarkMode ? "border-gray-700" : "border-gray-100")}>
+              <div className="pt-2 border-t border-gray-100">
                 <p className="text-gov-text-secondary mb-1">التفاصيل:</p>
                 <p className="leading-relaxed">{selectedRequest.details}</p>
               </div>
@@ -2545,61 +2533,29 @@ export default function App() {
           </Card>
 
           <Card>
-            <h3 className={cn("font-bold text-sm mb-6", isDarkMode ? "text-white" : "text-gov-text-primary")}>مسار الطلب</h3>
-            <div className="relative space-y-8 before:absolute before:right-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200 dark:before:bg-gray-700">
-              {/* Step 1: Submitted */}
-              <div className="relative pr-10">
-                <div className={cn(
-                  "absolute right-0 top-0.5 w-5 h-5 rounded-full border-4 flex items-center justify-center z-10",
-                  isDarkMode ? "bg-green-500 border-gray-800" : "bg-green-500 border-white"
-                )}>
-                  <Check size={10} className="text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold">تم استلام الطلب</p>
-                  <p className="text-[10px] text-gov-text-secondary">تم استلام طلبك بنجاح في النظام</p>
-                  <p className="text-[10px] text-gov-green mt-1 font-mono">{selectedRequest.date}</p>
-                </div>
+            <h3 className="font-bold text-sm mb-3">مسار الطلب</h3>
+            <div className="space-y-4 relative before:absolute before:right-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
+              <div className="relative pr-8">
+                <div className="absolute right-0 top-1 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow-sm" />
+                <p className="text-sm font-bold">تم استلام الطلب</p>
+                <p className="text-[10px] text-gov-text-secondary">{selectedRequest.date}</p>
               </div>
-
-              {/* Step 2: In Review */}
-              <div className="relative pr-10">
+              <div className="relative pr-8">
                 <div className={cn(
-                  "absolute right-0 top-0.5 w-5 h-5 rounded-full border-4 flex items-center justify-center z-10",
-                  selectedRequest.status !== 'PENDING' 
-                    ? (isDarkMode ? "bg-green-500 border-gray-800" : "bg-green-500 border-white")
-                    : (isDarkMode ? "bg-orange-500 border-gray-800 animate-pulse" : "bg-orange-500 border-white animate-pulse")
-                )}>
-                  {selectedRequest.status !== 'PENDING' ? <Check size={10} className="text-white" /> : <Clock size={10} className="text-white" />}
-                </div>
-                <div>
-                  <p className="text-sm font-bold">قيد المراجعة الفنية</p>
-                  <p className="text-[10px] text-gov-text-secondary">جاري فحص المستندات المرفقة والبيانات</p>
-                  {selectedRequest.status === 'PENDING' && (
-                    <span className="text-[10px] px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded mt-1 inline-block">قيد التنفيذ</span>
-                  )}
-                </div>
+                  'absolute right-0 top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm',
+                  selectedRequest.status !== 'PENDING' ? 'bg-green-500' : 'bg-orange-400 animate-pulse'
+                )} />
+                <p className="text-sm font-bold">قيد المراجعة الفنية</p>
+                <p className="text-[10px] text-gov-text-secondary">جاري فحص المستندات</p>
               </div>
-
-              {/* Step 3: Final Decision */}
-              <div className="relative pr-10">
+              <div className="relative pr-8">
                 <div className={cn(
-                  "absolute right-0 top-0.5 w-5 h-5 rounded-full border-4 flex items-center justify-center z-10",
-                  selectedRequest.status === 'APPROVED' ? (isDarkMode ? "bg-green-500 border-gray-800" : "bg-green-500 border-white") :
-                  selectedRequest.status === 'REJECTED' ? (isDarkMode ? "bg-red-500 border-gray-800" : "bg-red-500 border-white") :
-                  (isDarkMode ? "bg-gray-700 border-gray-800" : "bg-gray-200 border-white")
-                )}>
-                  {selectedRequest.status === 'APPROVED' ? <Check size={10} className="text-white" /> : 
-                   selectedRequest.status === 'REJECTED' ? <XCircle size={10} className="text-white" /> : null}
-                </div>
-                <div>
-                  <p className="text-sm font-bold">القرار النهائي</p>
-                  <p className="text-[10px] text-gov-text-secondary">
-                    {selectedRequest.status === 'APPROVED' ? 'تمت الموافقة على طلبك' : 
-                     selectedRequest.status === 'REJECTED' ? 'تم رفض الطلب، يرجى مراجعة التفاصيل' : 
-                     'بانتظار صدور القرار النهائي'}
-                  </p>
-                </div>
+                  'absolute right-0 top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm',
+                  selectedRequest.status === 'APPROVED' ? 'bg-green-500' : 
+                  selectedRequest.status === 'REJECTED' ? 'bg-red-500' : 'bg-gray-200'
+                )} />
+                <p className="text-sm font-bold">القرار النهائي</p>
+                <p className="text-[10px] text-gov-text-secondary">بانتظار الاعتماد</p>
               </div>
             </div>
           </Card>
