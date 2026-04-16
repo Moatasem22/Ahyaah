@@ -61,7 +61,12 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
 });
 
 app.get('/api/files', (req, res) => {
-  res.json(filesMetadata);
+  console.log(`Fetching metadata for ${filesMetadata.length} files`);
+  res.status(200).json({
+    success: true,
+    count: filesMetadata.length,
+    data: filesMetadata
+  });
 });
 
 // Vite middleware for development

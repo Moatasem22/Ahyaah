@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Upload, X, File, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, X, File, CheckCircle2, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -18,8 +18,28 @@ interface FileStatus {
 
 export const FileUpload = () => {
   const [files, setFiles] = useState<FileStatus[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchUploadedFiles();
+  }, []);
+
+  const fetchUploadedFiles = async () => {
+    try {
+      setIsFetching(true);
+      const response = await axios.get('/api/files');
+      if (response.data.success) {
+        setUploadedFiles(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch files:', error);
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -87,6 +107,7 @@ export const FileUpload = () => {
           next[i].progress = 100;
           return next;
         });
+        fetchUploadedFiles();
       } catch (error) {
         setFiles(prev => {
           const next = [...prev];
@@ -185,6 +206,37 @@ export const FileUpload = () => {
         >
           بدء الرفع ({files.filter(f => f.status === 'IDLE').length} ملفات)
         </button>
+      )}
+
+      {/* Server Files List */}
+      {uploadedFiles.length > 0 && (
+        <div className="pt-6 border-t border-gray-100 mt-6">
+          <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+            <CheckCircle2 size={18} className="text-gov-green" />
+            الملفات المرفوعة مسبقاً
+          </h3>
+          <div className="space-y-2">
+            {uploadedFiles.map((file, idx) => (
+              <div key={file.id || idx} className="bg-gray-50 border border-gray-100 rounded-lg p-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded bg-white flex items-center justify-center text-gov-green shadow-sm">
+                  <File size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate">{file.name}</p>
+                  <p className="text-[10px] text-gov-text-secondary">{file.size} • {new Date(file.date).toLocaleDateString('ar-YE')}</p>
+                </div>
+                <a 
+                  href={file.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-2 hover:bg-white rounded-full text-gov-green transition-colors shadow-sm"
+                >
+                  <ExternalLink size={16} />
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

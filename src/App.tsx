@@ -68,6 +68,9 @@ import {
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   type User as FirebaseUser
 } from 'firebase/auth';
 import { 
@@ -497,6 +500,41 @@ export default function App() {
     } catch (err) {
       console.error('Login error:', err);
       setError('فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithEmail = async (email: string, pass: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err: any) {
+      console.error('Email login error:', err);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+      } else {
+        setError('حدث خطأ أثناء تسجيل الدخول. يرجى التأكد من تفعيل خيار البريد الإلكتروني في Firebase.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const registerWithEmail = async (email: string, pass: string, name: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(userCredential.user, { displayName: name });
+    } catch (err: any) {
+      console.error('Email register error:', err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('هذا البريد الإلكتروني مستخدم بالفعل.');
+      } else {
+        setError('حدث خطأ أثناء إنشاء الحساب. يرجى التأكد من تفعيل خيار البريد الإلكتروني في Firebase.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -2056,7 +2094,15 @@ export default function App() {
   );
 
   const LoginScreen = () => {
-    const [loginError, setLoginError] = useState<string | null>(null);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (email && password) {
+        loginWithEmail(email, password);
+      }
+    };
 
     return (
       <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
@@ -2068,37 +2114,60 @@ export default function App() {
           <p className="text-gov-text-secondary">فرع تَعِز - الجمهورية اليمنية</p>
         </div>
 
-        <div className="space-y-4">
-          <Button 
-            className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
-            onClick={loginWithGoogle} 
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <RefreshCw size={20} className="animate-spin" />
-            ) : (
-              <>
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                تسجيل الدخول بواسطة جوجل
-              </>
-            )}
-          </Button>
-
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input 
+            label="البريد الإلكتروني" 
+            type="email" 
+            placeholder="example@mail.com" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Input 
+            label="كلمة المرور" 
+            type="password" 
+            placeholder="********" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          
           {error && (
             <p className="text-xs text-gov-error text-center bg-red-50 p-2 rounded-lg">{error}</p>
           )}
-          
+
+          <Button 
+            type="submit"
+            className="w-full py-4 bg-gov-green text-white font-bold shadow-lg" 
+            disabled={isLoading}
+          >
+            {isLoading ? <RefreshCw size={20} className="animate-spin" /> : 'تسجيل الدخول'}
+          </Button>
+
           <div className="relative py-4">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
             <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">أو</span></div>
           </div>
 
-          <p className="text-xs text-center text-gov-text-secondary leading-relaxed">
-            بمجرد تسجيل الدخول، يمكنك الوصول إلى كافة الخدمات الإلكترونية للهيئة وتتبع طلباتك ومعاملاتك بكل سهولة.
-          </p>
-        </div>
+          <Button 
+            type="button"
+            className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
+            onClick={loginWithGoogle} 
+            disabled={isLoading}
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+            تسجيل الدخول بواسطة جوجل
+          </Button>
 
-        <div className="mt-auto pt-10 text-center">
+          <div className="text-center pt-4">
+            <p className="text-sm text-gov-text-secondary">
+              ليس لديك حساب؟{' '}
+              <button type="button" onClick={() => navigate('REGISTER')} className="text-gov-link font-bold hover:underline">إنشاء حساب جديد</button>
+            </p>
+          </div>
+        </form>
+
+        <div className="mt-10 text-center">
           <button onClick={() => navigate('ABOUT')} className="text-gov-text-secondary text-sm flex items-center justify-center gap-1 mx-auto">
             <Info size={16} /> عن الهيئة
           </button>
@@ -2107,45 +2176,90 @@ export default function App() {
     );
   };
 
-  const RegisterScreen = () => (
-    <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
-      <div className="text-center mb-10">
-        <div className="w-24 h-24 bg-gov-green/10 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <img src="https://picsum.photos/seed/yemen-logo/200/200" alt="Authority Logo" className="w-16 h-16 object-contain" />
-        </div>
-        <h1 className="text-2xl font-bold text-gov-green">إنشاء حساب جديد</h1>
-        <p className="text-gov-text-secondary">انضم إلى المنصة الإلكترونية للهيئة</p>
-      </div>
+  const RegisterScreen = () => {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
 
-      <div className="space-y-6">
-        <Button 
-          className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
-          onClick={loginWithGoogle} 
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <RefreshCw size={20} className="animate-spin" />
-          ) : (
-            <>
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-              التسجيل بواسطة جوجل
-            </>
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (name && email && password) {
+        registerWithEmail(email, password, name);
+      }
+    };
+
+    return (
+      <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
+        <div className="text-center mb-10">
+          <div className="w-24 h-24 bg-gov-green/10 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <img src="https://picsum.photos/seed/yemen-logo/200/200" alt="Authority Logo" className="w-16 h-16 object-contain" />
+          </div>
+          <h1 className="text-2xl font-bold text-gov-green">إنشاء حساب جديد</h1>
+          <p className="text-gov-text-secondary">انضم إلى المنصة الإلكترونية للهيئة</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input 
+            label="الاسم الكامل" 
+            placeholder="أدخل اسمك الكامل" 
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <Input 
+            label="البريد الإلكتروني" 
+            type="email" 
+            placeholder="example@mail.com" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Input 
+            label="كلمة المرور" 
+            type="password" 
+            placeholder="********" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          {error && (
+            <p className="text-xs text-gov-error text-center bg-red-50 p-2 rounded-lg">{error}</p>
           )}
-        </Button>
 
-        <p className="text-xs text-center text-gov-text-secondary leading-relaxed px-4">
-          من خلال إنشاء حساب، فإنك توافق على <span className="text-gov-link underline">شروط الاستخدام</span> و <span className="text-gov-link underline">سياسة الخصوصية</span> الخاصة بالهيئة.
-        </p>
+          <Button 
+            type="submit"
+            className="w-full py-4 bg-gov-green text-white font-bold shadow-lg" 
+            disabled={isLoading}
+          >
+            {isLoading ? <RefreshCw size={20} className="animate-spin" /> : 'إنشاء الحساب'}
+          </Button>
 
-        <div className="text-center pt-4">
-          <p className="text-sm text-gov-text-secondary">
-            لديك حساب بالفعل؟{' '}
-            <button onClick={() => navigate('LOGIN')} className="text-gov-link font-bold hover:underline">تسجيل الدخول</button>
-          </p>
-        </div>
+          <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">أو</span></div>
+          </div>
+
+          <Button 
+            type="button"
+            className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
+            onClick={loginWithGoogle} 
+            disabled={isLoading}
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+            التسجيل بواسطة جوجل
+          </Button>
+
+          <div className="text-center pt-4">
+            <p className="text-sm text-gov-text-secondary">
+              لديك حساب بالفعل؟{' '}
+              <button type="button" onClick={() => navigate('LOGIN')} className="text-gov-link font-bold hover:underline">تسجيل الدخول</button>
+            </p>
+          </div>
+        </form>
       </div>
-    </div>
-  );
+    );
+  };
 
   const DashboardScreen = () => (
     <PageWrapper title="لوحة التحكم" showBack={false}>
