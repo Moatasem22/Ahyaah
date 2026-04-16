@@ -130,6 +130,7 @@ type Screen =
   | 'GAZETTES'
   | 'MAIN_MENU'
   | 'DOCUMENTS_UPLOAD'
+  | 'ADMIN'
   | 'NOTIFICATIONS';
 
 type ServiceCategory = 
@@ -422,7 +423,7 @@ export default function App() {
               idNumber: '',
               status: 'نشط',
               avatar: firebaseUser.photoURL || 'https://picsum.photos/seed/user/200/200',
-              role: 'user',
+              role: firebaseUser.email === 'mujeebalshehab@gmail.com' ? 'admin' : 'user',
               createdAt: new Date().toISOString()
             };
             await setDoc(userDocRef, newUser);
@@ -732,9 +733,10 @@ export default function App() {
                 { label: 'الملف الشخصي', icon: <User size={20} />, screen: 'PROFILE' },
                 { label: 'طلباتي', icon: <FileText size={20} />, screen: 'REQUESTS' },
                 { label: 'رفع المستندات', icon: <Upload size={20} />, screen: 'DOCUMENTS_UPLOAD' },
+                user.role === 'admin' && { label: 'لوحة الإدارة', icon: <LayoutDashboard size={20} />, screen: 'ADMIN' },
                 { label: 'الإعدادات', icon: <Settings size={20} />, screen: 'SETTINGS' },
                 { label: 'عن الهيئة', icon: <Info size={20} />, screen: 'ABOUT' },
-              ].map((item, idx) => (
+              ].filter(Boolean).map((item: any, idx) => (
                 <button
                   key={idx}
                   onClick={() => {
@@ -2936,6 +2938,123 @@ export default function App() {
     </PageWrapper>
   );
 
+  const AdminDashboardScreen = () => {
+    const [stats, setStats] = useState({ users: 0, requests: 0, complaints: 0 });
+    const [allRequests, setAllRequests] = useState<any[]>([]);
+
+    useEffect(() => {
+      const unsubRequests = onSnapshot(collection(db, 'requests'), (snapshot) => {
+        setAllRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setStats(prev => ({ ...prev, requests: snapshot.size }));
+      });
+      
+      const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+        setStats(prev => ({ ...prev, users: snapshot.size }));
+      });
+
+      return () => {
+        unsubRequests();
+        unsubUsers();
+      };
+    }, []);
+
+    const handleStatusUpdate = async (requestId: string, targetUid: string, newStatus: string) => {
+      try {
+        setIsLoading(true);
+        await setDoc(doc(db, 'requests', requestId), { status: newStatus }, { merge: true });
+        
+        // Create notification for the user
+        const notifRef = doc(collection(db, 'notifications'));
+        await setDoc(notifRef, {
+          uid: targetUid,
+          title: 'تحديث حالة الطلب',
+          body: `تم تحديث حالة طلبك إلى: ${newStatus === 'APPROVED' ? 'مقبول' : 'مرفوض'}`,
+          type: newStatus === 'APPROVED' ? 'SUCCESS' : 'ALERT',
+          date: new Date().toISOString(),
+          read: false,
+          url: 'REQUESTS'
+        });
+
+        addNotification('تم التحديث', `تم تغيير حالة الطلب إلى ${newStatus}`, 'SUCCESS');
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `requests/${requestId}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    return (
+      <PageWrapper title="لوحة الإدارة">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="p-4 bg-blue-50 border-blue-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500 text-white rounded-lg"><Users size={20} /></div>
+                <div>
+                  <p className="text-[10px] text-blue-600 font-bold">المستخدمين</p>
+                  <p className="text-xl font-bold text-blue-900">{stats.users}</p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4 bg-gov-green/10 border-gov-green/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gov-green text-white rounded-lg"><FileText size={20} /></div>
+                <div>
+                  <p className="text-[10px] text-gov-green font-bold">إجمالي الطلبات</p>
+                  <p className="text-xl font-bold text-gov-green">{stats.requests}</p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-bold mb-4 px-2">الطلبات الأخيرة</h3>
+            <div className="space-y-3">
+              {allRequests.map((req) => (
+                <Card key={req.id} className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-bold">{req.type}</p>
+                      <p className="text-[10px] text-gov-text-secondary mt-1">المستخدم: {req.uid?.substring(0, 8)}...</p>
+                    </div>
+                    <span className={cn(
+                      "text-[10px] px-2 py-1 rounded-full font-bold",
+                      req.status === 'PENDING' ? "bg-yellow-100 text-yellow-700" : 
+                      req.status === 'APPROVED' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                    )}>
+                      {req.status === 'PENDING' ? 'قيد الانتظار' : req.status === 'APPROVED' ? 'مقبول' : 'مرفوض'}
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-50 flex justify-between items-center">
+                    <p className="text-[9px] text-gov-text-secondary">{new Date(req.date).toLocaleString('ar-YE')}</p>
+                    <div className="flex gap-2">
+                      {req.status === 'PENDING' && (
+                        <>
+                          <button 
+                            className="px-3 py-1 text-[10px] bg-gov-green text-white rounded-lg font-bold"
+                            onClick={() => handleStatusUpdate(req.id, req.uid, 'APPROVED')}
+                          >
+                            قبول
+                          </button>
+                          <button 
+                            className="px-3 py-1 text-[10px] bg-red-500 text-white rounded-lg font-bold"
+                            onClick={() => handleStatusUpdate(req.id, req.uid, 'REJECTED')}
+                          >
+                            رفض
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </PageWrapper>
+    );
+  };
+
   const renderScreen = () => {
     switch (screen) {
       case 'ABOUT': return <AboutScreen />;
@@ -2966,6 +3085,7 @@ export default function App() {
       case 'COMPLAINT_TRACKING': return <ComplaintTrackingScreen />;
       case 'GAZETTES': return <GazetteScreen />;
       case 'DOCUMENTS_UPLOAD': return <DocumentsUploadScreen />;
+      case 'ADMIN': return <AdminDashboardScreen />;
       case 'MAIN_MENU': return <MainMenuScreen />;
       case 'NOTIFICATIONS': return <NotificationCenterScreen />;
       default: return <LoginScreen />;
