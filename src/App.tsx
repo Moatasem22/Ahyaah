@@ -432,7 +432,13 @@ export default function App() {
             await setDoc(userDocRef, newUser);
             setUser(newUser);
           } else {
-            setUser(userDoc.data() as any);
+            const userData = userDoc.data() as any;
+            // Force admin role for owner email if not already set
+            if (firebaseUser.email === 'mujeebalshehab@gmail.com' && userData.role !== 'admin') {
+              userData.role = 'admin';
+              await setDoc(userDocRef, { role: 'admin' }, { merge: true });
+            }
+            setUser(userData);
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -759,7 +765,12 @@ export default function App() {
                   <img src={user.avatar} alt="User" className="w-full h-full object-cover" />
                 </div>
                 <div className="text-right">
-                  <h3 className="font-bold text-sm">{user.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm">{user.name}</h3>
+                    {user.role === 'admin' && (
+                      <span className="bg-white/20 text-[8px] px-1.5 py-0.5 rounded-full border border-white/30">مسؤول</span>
+                    )}
+                  </div>
                   <p className="text-[10px] opacity-80">{user.insuranceNumber}</p>
                 </div>
               </div>

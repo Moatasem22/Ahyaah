@@ -56,22 +56,28 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "mujeebalshehab@gmail.com" && request.auth.token.email_verified == true));
+        (request.auth.token.email == "mujeebalshehab@gmail.com" && request.auth.token.email_verified == true ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isDocOwner(data) {
+       return isAuthenticated() && request.auth.uid == data.uid;
     }
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'name', 'email']) &&
-             data.uid is string && data.uid.size() > 0 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 128 &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             (data.role in ['user', 'admin']);
     }
 
     function isValidRequest(data) {
       return data.keys().hasAll(['uid', 'type', 'status', 'date']) &&
              data.uid == request.auth.uid &&
-             data.type is string &&
-             data.status in ['PENDING', 'APPROVED', 'REJECTED'];
+             data.type is string && data.type.size() < 100 &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'] &&
+             data.date is string; // ISO string validation if needed
     }
 
     // ===============================================================
@@ -79,9 +85,16 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
+      // Allow read if owner (prevents recursion by checking owner first)
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      
+      // Allow create: Owner email can be admin, others must be user
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) &&
+                    (request.resource.data.role == 'user' || (request.auth.token.email == "mujeebalshehab@gmail.com" && request.resource.data.role == 'admin'));
+      
+      // Allow update: Owners can update their info, but can't change role unless they are the owner email
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) &&
+                    (request.resource.data.role == resource.data.role || (request.auth.token.email == "mujeebalshehab@gmail.com" && request.auth.token.email_verified == true));
     }
 
     match /requests/{requestId} {
