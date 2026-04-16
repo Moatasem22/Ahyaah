@@ -64,6 +64,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { apiFetch, MOCK_NEWS, MOCK_GAZETTES, MOCK_EMPLOYEE_DATA, MOCK_PENSION_DATA } from './lib/api';
+import { 
+  requestNotificationPermission, 
+  registerServiceWorker, 
+  showLocalNotification, 
+  MOCK_NOTIFICATIONS, 
+  type AppNotification 
+} from './lib/notifications';
 import Splash from './components/Splash';
 
 // --- Utility ---
@@ -100,7 +107,8 @@ type Screen =
   | 'INSURANCE_CALC'
   | 'COMPLAINT_TRACKING'
   | 'GAZETTES'
-  | 'MAIN_MENU';
+  | 'MAIN_MENU'
+  | 'NOTIFICATIONS';
 
 type ServiceCategory = 
   | 'ALL'
@@ -308,6 +316,34 @@ export default function App() {
     newsUpdates: false,
     securityAlerts: true
   });
+  const [notifications, setNotifications] = useState<AppNotification[]>(MOCK_NOTIFICATIONS);
+
+  useEffect(() => {
+    const initNotifications = async () => {
+      if (notificationsEnabled) {
+        await registerServiceWorker();
+        await requestNotificationPermission();
+      }
+    };
+    initNotifications();
+  }, [notificationsEnabled]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const addNotification = (title: string, body: string, type: AppNotification['type'] = 'INFO') => {
+    const newNotif: AppNotification = {
+      id: Math.random().toString(36).substr(2, 9),
+      title,
+      body,
+      type,
+      date: new Date().toISOString().split('T')[0],
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+    if (notificationsEnabled) {
+      showLocalNotification(title, body);
+    }
+  };
 
   const [user, setUser] = useState({
     name: 'أحمد محمد علي',
@@ -510,7 +546,14 @@ export default function App() {
         <div className="flex items-center gap-3">
           {isLoggedIn && (
             <>
-              <Bell size={20} className="cursor-pointer hover:scale-110 transition-transform" />
+              <div className="relative cursor-pointer hover:scale-110 transition-transform" onClick={() => navigate('NOTIFICATIONS')}>
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
               <div 
                 onClick={() => navigate('PROFILE')}
                 className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center overflow-hidden border-2 border-white/30 cursor-pointer hover:border-white transition-all"
@@ -2249,6 +2292,19 @@ export default function App() {
         </section>
 
         <section>
+          <h3 className="text-xs font-bold text-gov-text-secondary uppercase mb-3 px-2">تجربة الميزات</h3>
+          <Card className={cn(isDarkMode && "bg-gray-800 border-gray-700")}>
+            <Button 
+              variant="outline" 
+              className="w-full flex items-center justify-center gap-2"
+              onClick={() => addNotification('تنبيه تجريبي', 'هذا إشعار تجريبي لمحاكاة وصول تحديث جديد من الهيئة.', 'SUCCESS')}
+            >
+              <Megaphone size={18} /> محاكاة وصول إشعار
+            </Button>
+          </Card>
+        </section>
+
+        <section>
           <h3 className="text-xs font-bold text-gov-text-secondary uppercase mb-3 px-2">قانوني</h3>
           <Card className={cn("space-y-4", isDarkMode && "bg-gray-800 border-gray-700")}>
             <button className="w-full flex justify-between items-center text-sm font-bold">
@@ -2584,6 +2640,56 @@ export default function App() {
   };
 
   // --- Router ---
+  const NotificationCenterScreen = () => (
+    <PageWrapper title="مركز الإشعارات">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center px-2">
+          <h3 className="text-xs font-bold text-gov-text-secondary uppercase">الإشعارات الأخيرة</h3>
+          <button 
+            onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))}
+            className="text-[10px] text-gov-green font-bold hover:underline"
+          >
+            تحديد الكل كمقروء
+          </button>
+        </div>
+        
+        {notifications.length > 0 ? (
+          notifications.map(notif => (
+            <Card 
+              key={notif.id} 
+              className={cn(
+                "p-4 border-r-4 transition-all hover:shadow-md cursor-pointer",
+                !notif.read ? "bg-white border-r-gov-green" : "bg-gray-50 border-r-gray-300 opacity-80",
+                isDarkMode && (notif.read ? "bg-gray-800/50 border-r-gray-700" : "bg-gray-800 border-r-gov-green")
+              )}
+              onClick={() => {
+                setNotifications(notifications.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                if (notif.url) navigate(notif.url as Screen);
+              }}
+            >
+              <div className="flex justify-between items-start mb-1">
+                <div className="flex items-center gap-2">
+                  {notif.type === 'SUCCESS' && <CheckCircle2 size={16} className="text-green-500" />}
+                  {notif.type === 'WARNING' && <AlertTriangle size={16} className="text-orange-500" />}
+                  {notif.type === 'ALERT' && <XCircle size={16} className="text-red-500" />}
+                  {notif.type === 'INFO' && <Info size={16} className="text-blue-500" />}
+                  <h4 className="text-sm font-bold">{notif.title}</h4>
+                </div>
+                <span className="text-[10px] text-gov-text-secondary">{notif.date}</span>
+              </div>
+              <p className="text-xs text-gov-text-secondary leading-relaxed">{notif.body}</p>
+            </Card>
+          ))
+        ) : (
+          <div className="text-center py-20">
+            <Bell size={48} className="mx-auto text-gray-200 mb-4" />
+            <p className="text-gov-text-secondary">لا توجد إشعارات حالياً</p>
+          </div>
+        )}
+      </div>
+    </PageWrapper>
+  );
+
   const renderScreen = () => {
     switch (screen) {
       case 'ABOUT': return <AboutScreen />;
@@ -2614,6 +2720,7 @@ export default function App() {
       case 'COMPLAINT_TRACKING': return <ComplaintTrackingScreen />;
       case 'GAZETTES': return <GazetteScreen />;
       case 'MAIN_MENU': return <MainMenuScreen />;
+      case 'NOTIFICATIONS': return <NotificationCenterScreen />;
       default: return <LoginScreen />;
     }
   };
