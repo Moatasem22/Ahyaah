@@ -58,7 +58,12 @@ import {
   Users2,
   Briefcase,
   ShieldAlert,
-  Medal
+  Medal,
+  LayoutGrid,
+  Zap,
+  Globe,
+  HeartHandshake,
+  UserCog
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -71,6 +76,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  ConfirmationResult,
   type User as FirebaseUser
 } from 'firebase/auth';
 import { 
@@ -96,6 +104,8 @@ import {
 } from './lib/notifications';
 import Splash from './components/Splash';
 import { FileUpload } from './components/FileUpload';
+import { LoginScreen } from './components/LoginScreen';
+import { RegisterScreen } from './components/RegisterScreen';
 
 // --- Utility ---
 function cn(...inputs: ClassValue[]) {
@@ -199,7 +209,7 @@ interface RequestItem {
 
 // --- Components ---
 
-const Button = ({ 
+export const Button = ({ 
   children, 
   className, 
   variant = 'primary', 
@@ -227,7 +237,7 @@ const Button = ({
   );
 };
 
-const Card = ({ children, className, ...props }: { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
+export const Card = ({ children, className, ...props }: { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn(
     'p-5 rounded-2xl shadow-lg border transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5', 
     'bg-white border-gray-100 text-gov-text-primary',
@@ -300,7 +310,7 @@ const NewsTicker = () => {
   );
 };
 
-const Input = ({ label, error, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string }) => (
+export const Input = ({ label, error, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string; error?: string }) => (
   <div className="flex flex-col gap-1 w-full">
     {label && <label className="text-sm font-semibold opacity-90">{label}</label>}
     <input 
@@ -375,6 +385,8 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [verificationId, setVerificationId] = useState<string | null>(null);
   const [language, setLanguage] = useState<'AR' | 'EN'>('AR');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -546,6 +558,57 @@ export default function App() {
     }
   };
 
+  const setupRecaptcha = (containerId: string) => {
+    try {
+      if (!(window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+          size: 'invisible',
+          callback: () => {
+            console.log('Recaptcha resolved');
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Recaptcha error:', err);
+    }
+  };
+
+  const loginWithPhone = async (phoneNumber: string, containerId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      setupRecaptcha(containerId);
+      const appVerifier = (window as any).recaptchaVerifier;
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+      setConfirmationResult(confirmation);
+      addNotification('تم إرسال الرمز', 'تم إرسال رمز التحقق إلى رقم هاتفك.', 'SUCCESS');
+    } catch (err: any) {
+      console.error('Phone login error:', err);
+      setError('فشل إرسال رمز التحقق. يرجى التأكد من صحة رقم الهاتف وتفعيل الخدمة.');
+      if ((window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier.clear();
+        (window as any).recaptchaVerifier = null;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyOtp = async (otp: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!confirmationResult) throw new Error('No confirmation result');
+      await confirmationResult.confirm(otp);
+      setConfirmationResult(null);
+    } catch (err: any) {
+      console.error('OTP verify error:', err);
+      setError('رمز التحقق غير صحيح. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     setIsLoading(true);
     try {
@@ -601,15 +664,17 @@ export default function App() {
     { id: 'CMP-102', title: 'خطأ في البيانات البنكية', status: 'RESOLVED', date: '2024-02-10', details: 'تم تعديل رقم الحساب ولكن لم يظهر في النظام.' },
   ]);
 
-  const servicesData: Record<ServiceCategory, { title: string, icon: React.ReactNode, items: ServiceItem[] }> = {
+  const servicesData: Record<ServiceCategory, { title: string, icon: React.ReactNode, color: string, items: ServiceItem[] }> = {
     ALL: {
       title: 'جميع الخدمات',
-      icon: <Menu size={20} />,
-      items: [] // Will be populated dynamically or with a subset
+      icon: <LayoutGrid size={24} />,
+      color: 'bg-blue-500',
+      items: []
     },
     PRIORITY: {
       title: 'خدمات ذات أولوية',
-      icon: <Star size={20} />,
+      icon: <Zap size={24} />,
+      color: 'bg-amber-500',
       items: [
         { id: 'prio_1', title: 'صرف معاش تقاعدي', description: 'طلب صرف المعاش التقاعدي الأول', icon: <Coins size={20} />, type: 'FORM' },
         { id: 'prio_2', title: 'تحديث بيانات الحساب البنكي', description: 'تغيير رقم الحساب لاستلام المعاش', icon: <RefreshCw size={20} />, type: 'FORM' },
@@ -617,7 +682,8 @@ export default function App() {
     },
     AGENT: {
       title: 'خدمات الوكيل',
-      icon: <UserCheck size={20} />,
+      icon: <UserCog size={24} />,
+      color: 'bg-purple-500',
       items: [
         { id: 'age_1', title: 'تسجيل وكيل جديد', description: 'إضافة وكيل لإدارة المعاملات', icon: <UserPlus size={20} />, type: 'FORM' },
         { id: 'age_2', title: 'تجديد وكالة', description: 'تحديث بيانات الوكالة القائمة', icon: <RefreshCw size={20} />, type: 'FORM' },
@@ -625,7 +691,8 @@ export default function App() {
     },
     BENEFICIARY: {
       title: 'خدمات المستحقين',
-      icon: <Users2 size={20} />,
+      icon: <HeartHandshake size={24} />,
+      color: 'bg-rose-500',
       items: [
         { id: 'ben_1', title: 'استعلام عن نصيب الورثة', description: 'توزيع المعاش بين المستحقين', icon: <LayoutDashboard size={20} />, type: 'INQUIRY' },
         { id: 'ben_2', title: 'طلب شهادة استحقاق معاش', description: 'إثبات استلام معاش للمستفيد', icon: <FileText size={20} />, type: 'FORM' },
@@ -633,14 +700,16 @@ export default function App() {
     },
     GUARDIAN: {
       title: 'خدمات القيّم',
-      icon: <ShieldAlert size={20} />,
+      icon: <ShieldAlert size={24} />,
+      color: 'bg-orange-600',
       items: [
         { id: 'gua_1', title: 'إثبات حالة القيّم', description: 'تقديم مستندات القوامة القانونية', icon: <FileText size={20} />, type: 'FORM' },
       ]
     },
     EMPLOYER: {
       title: 'خدمات جهة العمل',
-      icon: <Briefcase size={20} />,
+      icon: <Building2 size={24} />,
+      color: 'bg-indigo-600',
       items: [
         { id: 'emp_1', title: 'رفع كشوفات الاشتراكات', description: 'تحميل ملفات الاشتراكات الشهرية', icon: <Upload size={20} />, type: 'FORM' },
         { id: 'emp_2', title: 'استعلام عن مديونية الجهة', description: 'معرفة المبالغ المستحقة', icon: <Activity size={20} />, type: 'INQUIRY' },
@@ -648,7 +717,8 @@ export default function App() {
     },
     INSURED: {
       title: 'خدمات المؤمن عليه',
-      icon: <ShieldCheck size={20} />,
+      icon: <ShieldCheck size={24} />,
+      color: 'bg-emerald-600',
       items: [
         { id: 'ins_1', title: 'تحديث بيانات المؤمن عليه', description: 'تحديث البيانات الشخصية والوظيفية', icon: <User size={20} />, type: 'FORM' },
         { id: 'ins_2', title: 'استعلام عن مدة الخدمة', description: 'معرفة سنوات الخدمة المسجلة', icon: <Clock size={20} />, type: 'INQUIRY' },
@@ -656,14 +726,16 @@ export default function App() {
     },
     TRUSTEE: {
       title: 'خدمات الوصي',
-      icon: <UserCheck size={20} />,
+      icon: <Users size={24} />,
+      color: 'bg-teal-600',
       items: [
         { id: 'tru_1', title: 'تسجيل وصي شرعي', description: 'إضافة بيانات الوصي القانوني', icon: <UserPlus size={20} />, type: 'FORM' },
       ]
     },
     PENSIONER: {
       title: 'خدمات المتقاعدين',
-      icon: <User size={20} />,
+      icon: <Target size={24} />,
+      color: 'bg-gov-green',
       items: [
         { id: 'pen_1', title: 'استعلام عن حالة المعاش', description: 'متابعة حالة صرف المعاش الشهري', icon: <CreditCard size={20} />, type: 'INQUIRY' },
         { id: 'pen_3', title: 'تقديم إقرار حياة سنوي', description: 'تحديث الحالة السنوية للمتقاعد', icon: <CheckCircle2 size={20} />, type: 'FORM' },
@@ -671,7 +743,8 @@ export default function App() {
     },
     MILITARY: {
       title: 'خدمات العسكريين',
-      icon: <Medal size={20} />,
+      icon: <Medal size={24} />,
+      color: 'bg-red-700',
       items: [
         { id: 'mil_1', title: 'استعلام عن المعاش العسكري', description: 'تفاصيل المعاش لمنتسبي القوات المسلحة', icon: <Shield size={20} />, type: 'INQUIRY' },
         { id: 'mil_2', title: 'طلب شهادة خدمة عسكرية', description: 'إصدار بيان خدمة عسكرية', icon: <FileText size={20} />, type: 'FORM' },
@@ -679,7 +752,8 @@ export default function App() {
     },
     VISITOR: {
       title: 'خدمات الزوار',
-      icon: <HelpCircle size={20} />,
+      icon: <Globe size={24} />,
+      color: 'bg-cyan-600',
       items: [
         { id: 'vis_1', title: 'حاسبة المعاش التقديرية', description: 'حساب المعاش المتوقع عند التقاعد', icon: <Calculator size={20} />, type: 'CALCULATOR' },
         { id: 'vis_4', title: 'الجريدة الرسمية', description: 'الاطلاع على أحدث القوانين والقرارات', icon: <Scale size={20} />, type: 'INQUIRY' },
@@ -687,7 +761,8 @@ export default function App() {
     },
     SOCIAL_INSURANCE: {
       title: 'خدمات التأمين الاجتماعي',
-      icon: <Activity size={20} />,
+      icon: <Coins size={24} />,
+      color: 'bg-violet-600',
       items: [
         { id: 'soc_1', title: 'استعلام عن حصص الاشتراكات', description: 'معرفة المبالغ المستقطعة والموردة', icon: <Calculator size={20} />, type: 'INQUIRY' },
       ]
@@ -1055,13 +1130,16 @@ export default function App() {
                 return (
                   <Card 
                     key={catKey} 
-                    className="flex flex-col items-center text-center gap-2 cursor-pointer hover:shadow-md transition-all p-4 border-2 bg-white border-gray-100" 
+                    className="flex flex-col items-center text-center gap-2 cursor-pointer hover:shadow-md transition-all p-4 border-2 bg-white border-gray-100 group" 
                     onClick={() => navigateToCategory(catKey)}
                   >
-                    <div className="p-4 rounded-full mb-1 bg-gov-bg text-gov-green">
+                    <div className={cn(
+                      "p-4 rounded-2xl mb-1 text-white shadow-lg transition-transform group-hover:scale-110",
+                      cat.color
+                    )}>
                       {cat.icon}
                     </div>
-                    <h3 className="font-bold text-sm text-gov-text-primary">{cat.title}</h3>
+                    <h3 className="font-bold text-sm text-gov-text-primary mt-1">{cat.title}</h3>
                     <p className="text-[10px] text-gov-text-secondary leading-tight">
                       {cat.items.length} خدمات متاحة
                     </p>
@@ -2104,174 +2182,6 @@ export default function App() {
     </PageWrapper>
   );
 
-  const LoginScreen = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (email && password) {
-        loginWithEmail(email, password);
-      }
-    };
-
-    return (
-      <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
-        <div className="text-center mb-10">
-          <div className="w-24 h-24 bg-gov-green/10 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <img src="https://picsum.photos/seed/yemen-logo/200/200" alt="Authority Logo" className="w-16 h-16 object-contain" />
-          </div>
-          <h1 className="text-2xl font-bold text-gov-green">الهيئة العامة للتأمينات والمعاشات</h1>
-          <p className="text-gov-text-secondary">فرع تَعِز - الجمهورية اليمنية</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input 
-            label="البريد الإلكتروني" 
-            type="email" 
-            placeholder="example@mail.com" 
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Input 
-            label="كلمة المرور" 
-            type="password" 
-            placeholder="********" 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          
-          {error && (
-            <p className="text-xs text-gov-error text-center bg-red-50 p-2 rounded-lg">{error}</p>
-          )}
-
-          <Button 
-            type="submit"
-            className="w-full py-4 bg-gov-green text-white font-bold shadow-lg" 
-            disabled={isLoading}
-          >
-            {isLoading ? <RefreshCw size={20} className="animate-spin" /> : 'تسجيل الدخول'}
-          </Button>
-
-          <div className="relative py-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">أو</span></div>
-          </div>
-
-          <Button 
-            type="button"
-            className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
-            onClick={loginWithGoogle} 
-            disabled={isLoading}
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-            تسجيل الدخول بواسطة جوجل
-          </Button>
-
-          <div className="text-center pt-4">
-            <p className="text-sm text-gov-text-secondary">
-              ليس لديك حساب؟{' '}
-              <button type="button" onClick={() => navigate('REGISTER')} className="text-gov-link font-bold hover:underline">إنشاء حساب جديد</button>
-            </p>
-          </div>
-        </form>
-
-        <div className="mt-10 text-center">
-          <button onClick={() => navigate('ABOUT')} className="text-gov-text-secondary text-sm flex items-center justify-center gap-1 mx-auto">
-            <Info size={16} /> عن الهيئة
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const RegisterScreen = () => {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (name && email && password) {
-        registerWithEmail(email, password, name);
-      }
-    };
-
-    return (
-      <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
-        <div className="text-center mb-10">
-          <div className="w-24 h-24 bg-gov-green/10 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <img src="https://picsum.photos/seed/yemen-logo/200/200" alt="Authority Logo" className="w-16 h-16 object-contain" />
-          </div>
-          <h1 className="text-2xl font-bold text-gov-green">إنشاء حساب جديد</h1>
-          <p className="text-gov-text-secondary">انضم إلى المنصة الإلكترونية للهيئة</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input 
-            label="الاسم الكامل" 
-            placeholder="أدخل اسمك الكامل" 
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <Input 
-            label="البريد الإلكتروني" 
-            type="email" 
-            placeholder="example@mail.com" 
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Input 
-            label="كلمة المرور" 
-            type="password" 
-            placeholder="********" 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-
-          {error && (
-            <p className="text-xs text-gov-error text-center bg-red-50 p-2 rounded-lg">{error}</p>
-          )}
-
-          <Button 
-            type="submit"
-            className="w-full py-4 bg-gov-green text-white font-bold shadow-lg" 
-            disabled={isLoading}
-          >
-            {isLoading ? <RefreshCw size={20} className="animate-spin" /> : 'إنشاء الحساب'}
-          </Button>
-
-          <div className="relative py-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">أو</span></div>
-          </div>
-
-          <Button 
-            type="button"
-            className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
-            onClick={loginWithGoogle} 
-            disabled={isLoading}
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-            التسجيل بواسطة جوجل
-          </Button>
-
-          <div className="text-center pt-4">
-            <p className="text-sm text-gov-text-secondary">
-              لديك حساب بالفعل؟{' '}
-              <button type="button" onClick={() => navigate('LOGIN')} className="text-gov-link font-bold hover:underline">تسجيل الدخول</button>
-            </p>
-          </div>
-        </form>
-      </div>
-    );
-  };
-
   const DashboardScreen = () => (
     <PageWrapper title="لوحة التحكم" showBack={false}>
       <div className="space-y-6">
@@ -3213,7 +3123,42 @@ export default function App() {
       case 'ADMIN': return <AdminDashboardScreen />;
       case 'MAIN_MENU': return <MainMenuScreen />;
       case 'NOTIFICATIONS': return <NotificationCenterScreen />;
-      default: return <LoginScreen />;
+      case 'LOGIN': return (
+        <LoginScreen 
+          isLoading={isLoading}
+          error={error}
+          loginWithGoogle={loginWithGoogle}
+          loginWithEmail={loginWithEmail}
+          loginWithPhone={loginWithPhone}
+          verifyOtp={verifyOtp}
+          confirmationResult={confirmationResult}
+          navigate={navigate}
+        />
+      );
+      case 'REGISTER': return (
+        <RegisterScreen 
+          isLoading={isLoading}
+          error={error}
+          loginWithGoogle={loginWithGoogle}
+          registerWithEmail={registerWithEmail}
+          loginWithPhone={loginWithPhone}
+          verifyOtp={verifyOtp}
+          confirmationResult={confirmationResult}
+          navigate={navigate}
+        />
+      );
+      default: return (
+        <LoginScreen 
+          isLoading={isLoading}
+          error={error}
+          loginWithGoogle={loginWithGoogle}
+          loginWithEmail={loginWithEmail}
+          loginWithPhone={loginWithPhone}
+          verifyOtp={verifyOtp}
+          confirmationResult={confirmationResult}
+          navigate={navigate}
+        />
+      );
     }
   };
 
