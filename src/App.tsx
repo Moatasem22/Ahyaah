@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, type ReactNode } from 'react';
 import { 
   Home, 
   User, 
@@ -377,6 +377,73 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   }
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
+}
+
+// --- Error Boundary ---
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  errorInfo: any;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    // @ts-ignore
+    this.state = { hasError: false, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    try {
+      const parsed = JSON.parse(error.message);
+      return { hasError: true, errorInfo: parsed };
+    } catch {
+      return { hasError: true, errorInfo: { error: String(error) } };
+    }
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  override render() {
+    // @ts-ignore
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-red-50 text-center">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+            <AlertTriangle size={32} />
+          </div>
+          <h1 className="text-xl font-bold text-red-800 mb-2">عذراً، حدث خطأ غير متوقع</h1>
+          <p className="text-red-600 mb-6 max-w-md">
+            {/* @ts-ignore */}
+            {this.state.errorInfo?.error?.includes('Missing or insufficient permissions') 
+              ? 'لا تملك صلاحيات كافية لإتمام هذه العملية. يرجى التأكد من تسجيل الدخول أو التواصل مع الدعم.'
+              : 'حدث خطأ في النظام. يرجى المحاولة مرة أخرى لاحقاً.'}
+          </p>
+          {/* @ts-ignore */}
+          {this.state.errorInfo?.operationType && (
+            <div className="text-xs text-red-400 mb-4 font-mono">
+              {/* @ts-ignore */}
+              Op: {this.state.errorInfo.operationType} | Path: {this.state.errorInfo.path}
+            </div>
+          )}
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors"
+          >
+            إعادة تحميل الصفحة
+          </button>
+        </div>
+      );
+    }
+
+    // @ts-ignore
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -3094,8 +3161,6 @@ export default function App() {
     switch (screen) {
       case 'ABOUT': return <AboutScreen />;
       case 'SERVICES': return <ServicesScreen />;
-      case 'LOGIN': return <LoginScreen />;
-      case 'REGISTER': return <RegisterScreen />;
       case 'DASHBOARD': return <DashboardScreen />;
       case 'BASIC_DATA': return <BasicDataScreen />;
       case 'EDIT_DATA': return <EditDataScreen />;
@@ -3163,13 +3228,13 @@ export default function App() {
   };
 
   return (
-    <>
+    <ErrorBoundary>
       <Splash onFinish={() => setShowSplash(false)} />
       {!showSplash && (
         <AnimatePresence mode="wait">
           {renderScreen()}
         </AnimatePresence>
       )}
-    </>
+    </ErrorBoundary>
   );
 }
