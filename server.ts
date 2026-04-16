@@ -17,7 +17,10 @@ async function startServer() {
 
   // Serve Service Worker explicitly to avoid redirects
   app.get("/service-worker.js", (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "service-worker.js"));
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Service-Worker-Allowed", "/");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.sendFile(path.resolve(__dirname, "public", "service-worker.js"));
   });
 
   // API Routes
