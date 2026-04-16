@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (matches auth.uid)
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - phone: string
+    //   - address: string
+    //   - insuranceNumber: string
+    //   - idNumber: string
+    //   - status: string
+    //   - avatar: string
+    //   - role: string (user/admin)
+    //   - createdAt: timestamp
+    //
+    // Collection: requests
+    // Document ID: {requestId}
+    // Fields:
+    //   - uid: string (required, owner)
+    //   - type: string (required)
+    //   - status: string (PENDING/APPROVED/REJECTED)
+    //   - date: timestamp
+    //   - details: map
+    //
+    // Collection: notifications
+    // Document ID: {notificationId}
+    // Fields:
+    //   - uid: string (required, recipient)
+    //   - title: string (required)
+    //   - body: string (required)
+    //   - type: string (INFO/SUCCESS/WARNING/ALERT)
+    //   - date: timestamp
+    //   - read: bool
+    //   - url: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "mujeebalshehab@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidRequest(data) {
+      return data.keys().hasAll(['uid', 'type', 'status', 'date']) &&
+             data.uid == request.auth.uid &&
+             data.type is string &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+    }
+
+    match /requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidRequest(request.resource.data);
+      allow update: if isAdmin(); // Only admins can update request status
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAdmin(); // Only system/admin can create notifications
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+  }
+}

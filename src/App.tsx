@@ -63,6 +63,26 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut,
+  type User as FirebaseUser
+} from 'firebase/auth';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy,
+  getDocFromServer,
+  Timestamp
+} from 'firebase/firestore';
+import { auth, db } from './firebase';
 import { apiFetch, MOCK_NEWS, MOCK_GAZETTES, MOCK_EMPLOYEE_DATA, MOCK_PENSION_DATA } from './lib/api';
 import { 
   requestNotificationPermission, 
@@ -205,47 +225,35 @@ const Card = ({ children, className, ...props }: { children: React.ReactNode; cl
   <div className={cn(
     'p-5 rounded-2xl shadow-lg border transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5', 
     'bg-white border-gray-100 text-gov-text-primary',
-    'dark:bg-gray-800 dark:border-gray-700 dark:text-white',
     className
   )} {...props}>
     {children}
   </div>
 );
 
-const ServiceCard: React.FC<{ item: ServiceItem; onClick: () => void; isDarkMode: boolean }> = ({ item, onClick, isDarkMode }) => (
+const ServiceCard: React.FC<{ item: ServiceItem; onClick: () => void }> = ({ item, onClick }) => (
   <Card 
-    className={cn(
-      "flex items-center gap-4 cursor-pointer hover:border-gov-green transition-all group", 
-      isDarkMode && "bg-gray-800 border-gray-700 hover:bg-gray-700"
-    )} 
+    className="flex items-center gap-4 cursor-pointer hover:border-gov-green transition-all group bg-white border-gray-100" 
     onClick={onClick}
   >
-    <div className={cn(
-      "p-3 rounded-xl transition-colors group-hover:bg-gov-green group-hover:text-white",
-      isDarkMode ? "bg-gray-700 text-gov-green" : "bg-gov-bg text-gov-green"
-    )}>
+    <div className="p-3 bg-gov-bg text-gov-green rounded-xl transition-colors group-hover:bg-gov-green group-hover:text-white">
       {item.icon}
     </div>
     <div className="flex-1">
-      <h4 className={cn("text-sm font-bold transition-colors group-hover:text-gov-green", isDarkMode ? "text-white" : "text-gov-text-primary")}>
+      <h4 className="text-sm font-bold transition-colors group-hover:text-gov-green text-gov-text-primary">
         {item.title}
       </h4>
       <p className="text-[10px] text-gov-text-secondary line-clamp-1">
         {item.description}
       </p>
     </div>
-    <div className={cn(
-      "text-[10px] font-bold px-2 py-1 rounded-lg border transition-all",
-      isDarkMode 
-        ? "bg-gray-900/50 border-gray-600 text-gray-400 group-hover:border-gov-green group-hover:text-gov-green" 
-        : "bg-gray-50 border-gray-100 text-gov-text-secondary group-hover:border-gov-green group-hover:text-gov-green"
-    )}>
+    <div className="text-[10px] font-bold px-2 py-1 bg-gray-50 border border-gray-100 text-gov-text-secondary rounded-lg transition-all group-hover:border-gov-green group-hover:text-gov-green">
       {item.type === 'FORM' ? 'طلب' : item.type === 'INQUIRY' ? 'استعلام' : item.type === 'CALCULATOR' ? 'حاسبة' : 'تحميل'}
     </div>
   </Card>
 );
 
-const NewsTicker = ({ isDarkMode }: { isDarkMode: boolean }) => {
+const NewsTicker = () => {
   const [news, setNews] = useState<string[]>([]);
 
   useEffect(() => {
@@ -259,10 +267,7 @@ const NewsTicker = ({ isDarkMode }: { isDarkMode: boolean }) => {
   }, []);
 
   return (
-    <div className={cn(
-      "text-white text-[10px] flex items-center overflow-hidden relative h-9 shadow-md border-b",
-      isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gov-green border-white/10"
-    )}>
+    <div className="bg-gov-green text-white text-[10px] flex items-center overflow-hidden relative h-9 shadow-md border-b border-white/10">
       <div className="bg-red-600 text-white px-3 flex items-center gap-1.5 z-20 absolute right-0 h-full shadow-[-4px_0_12px_rgba(0,0,0,0.3)] font-black italic tracking-wider">
         <motion.div
           animate={{ scale: [1, 1.2, 1] }}
@@ -296,8 +301,7 @@ const Input = ({ label, error, ...props }: React.InputHTMLAttributes<HTMLInputEl
       className={cn(
         'px-4 py-2 rounded-gov border transition-colors outline-none',
         'bg-white border-gray-300 text-gov-text-primary focus:border-gov-green',
-        'dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:border-gov-green',
-        error && 'border-gov-error dark:border-gov-error',
+        error && 'border-gov-error',
         props.className
       )}
       {...props}
@@ -308,32 +312,203 @@ const Input = ({ label, error, ...props }: React.InputHTMLAttributes<HTMLInputEl
 
 // --- Main App ---
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [screen, setScreen] = useState<Screen>('LOGIN');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [language, setLanguage] = useState<'AR' | 'EN'>('AR');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [history, setHistory] = useState<Screen[]>(['LOGIN']);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+
   const [notificationSettings, setNotificationSettings] = useState({
     pensionPayments: true,
     requestStatus: true,
     newsUpdates: false,
     securityAlerts: true
   });
-  const [notifications, setNotifications] = useState<AppNotification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  const [user, setUser] = useState({
+    name: 'جاري التحميل...',
+    idNumber: '',
+    insuranceNumber: '',
+    email: '',
+    phone: '',
+    address: '',
+    status: '',
+    avatar: 'https://picsum.photos/seed/user/200/200'
+  });
+
+  const [requests, setRequests] = useState<RequestItem[]>([]);
+
+  // Firebase Auth Listener
   useEffect(() => {
-    const initNotifications = async () => {
-      if (notificationsEnabled) {
-        await registerServiceWorker();
-        await requestNotificationPermission();
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setCurrentUser(firebaseUser);
+      if (firebaseUser) {
+        setIsLoggedIn(true);
+        setScreen('DASHBOARD');
+        
+        // Sync user profile
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        try {
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
+            const newUser = {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || 'مستخدم جديد',
+              email: firebaseUser.email || '',
+              phone: '',
+              address: '',
+              insuranceNumber: 'INS-' + Math.floor(100000 + Math.random() * 900000),
+              idNumber: '',
+              status: 'نشط',
+              avatar: firebaseUser.photoURL || 'https://picsum.photos/seed/user/200/200',
+              role: 'user',
+              createdAt: new Date().toISOString()
+            };
+            await setDoc(userDocRef, newUser);
+            setUser(newUser);
+          } else {
+            setUser(userDoc.data() as any);
+          }
+        } catch (err) {
+          handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
+        }
+      } else {
+        setIsLoggedIn(false);
+        setScreen('LOGIN');
       }
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Firestore Data Listeners
+  useEffect(() => {
+    if (!currentUser || !isAuthReady) return;
+
+    // Listen for requests
+    const requestsQuery = query(
+      collection(db, 'requests'),
+      where('uid', '==', currentUser.uid),
+      orderBy('date', 'desc')
+    );
+    const unsubRequests = onSnapshot(requestsQuery, (snapshot) => {
+      const reqList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RequestItem));
+      setRequests(reqList);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'requests'));
+
+    // Listen for notifications
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('uid', '==', currentUser.uid),
+      orderBy('date', 'desc')
+    );
+    const unsubNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+      const notifList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+      setNotifications(notifList);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'notifications'));
+
+    return () => {
+      unsubRequests();
+      unsubNotifications();
     };
-    initNotifications();
-  }, [notificationsEnabled]);
+  }, [currentUser, isAuthReady]);
+
+  // Test Connection
+  useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setIsLoading(true);
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -351,23 +526,6 @@ export default function App() {
       showLocalNotification(title, body);
     }
   };
-
-  const [user, setUser] = useState({
-    name: 'أحمد محمد علي',
-    idNumber: '123456789',
-    insuranceNumber: 'INS-987654',
-    email: 'ahmed@example.com',
-    phone: '777123456',
-    address: 'تعز - شارع جمال',
-    status: 'نشط',
-    avatar: 'https://picsum.photos/seed/user/200/200'
-  });
-
-  const [requests, setRequests] = useState<RequestItem[]>([
-    { id: 'REQ-001', type: 'طلب معاش تقاعدي', status: 'PENDING', date: '2024-03-01', details: 'طلب مقدم للحصول على المعاش التقاعدي المبكر.' },
-    { id: 'REQ-002', type: 'تحديث بيانات بنكية', status: 'APPROVED', date: '2024-02-15', details: 'تحديث رقم الحساب البنكي لاستلام المعاش.' },
-    { id: 'REQ-003', type: 'شهادة إثبات حالة', status: 'REJECTED', date: '2024-01-20', details: 'طلب شهادة إثبات حالة تأمينية.' },
-  ]);
 
   const [subscriptions] = useState<Subscription[]>([
     { id: 'SUB-001', period: 'يناير 2024', amount: '5000 ر.ي', status: 'ACTIVE' },
@@ -514,17 +672,101 @@ export default function App() {
   const navigate = (to: Screen) => {
     setIsLoading(true);
     setTimeout(() => {
+      setHistory(prev => [...prev, to]);
       setScreen(to);
       setIsLoading(false);
     }, 500);
   };
 
+  const goBack = () => {
+    if (history.length <= 1) return;
+    setIsLoading(true);
+    setTimeout(() => {
+      const newHistory = [...history];
+      newHistory.pop(); // Remove current
+      const prevScreen = newHistory[newHistory.length - 1];
+      setHistory(newHistory);
+      setScreen(prevScreen);
+      setIsLoading(false);
+    }, 500);
+  };
+
   // Layout Wrappers
+  const Sidebar = () => (
+    <AnimatePresence>
+      {isSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/50 z-[100] max-w-md mx-auto"
+          />
+          {/* Sidebar Content */}
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 bottom-0 w-3/4 bg-white z-[101] shadow-2xl flex flex-col max-w-[300px]"
+          >
+            <div className="p-6 bg-gov-green text-white">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full border-2 border-white/50 overflow-hidden">
+                  <img src={user.avatar} alt="User" className="w-full h-full object-cover" />
+                </div>
+                <div className="text-right">
+                  <h3 className="font-bold text-sm">{user.name}</h3>
+                  <p className="text-[10px] opacity-80">{user.insuranceNumber}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 py-4">
+              {[
+                { label: 'الرئيسية', icon: <Home size={20} />, screen: 'DASHBOARD' },
+                { label: 'الملف الشخصي', icon: <User size={20} />, screen: 'PROFILE' },
+                { label: 'طلباتي', icon: <FileText size={20} />, screen: 'REQUESTS' },
+                { label: 'الإعدادات', icon: <Settings size={20} />, screen: 'SETTINGS' },
+                { label: 'عن الهيئة', icon: <Info size={20} />, screen: 'ABOUT' },
+              ].map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    navigate(item.screen as Screen);
+                    setIsSidebarOpen(false);
+                  }}
+                  className="w-full flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors text-right"
+                >
+                  <span className="text-gov-green">{item.icon}</span>
+                  <span className="font-bold text-sm text-gov-text-primary">{item.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="p-6 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setIsSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-4 text-red-500 font-bold text-sm text-right"
+              >
+                <LogOut size={20} />
+                <span>تسجيل الخروج</span>
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+
   const PageWrapper = ({ children, title, showBack = true, showNav = true }: { children: React.ReactNode; title: string; showBack?: boolean; showNav?: boolean }) => (
-    <div className={cn(
-      "min-h-screen flex flex-col max-w-md mx-auto relative overflow-hidden transition-colors duration-300",
-      isDarkMode ? "bg-gray-950 text-white dark" : "bg-gov-bg text-gov-text-primary"
-    )}>
+    <div className="min-h-screen flex flex-col max-w-md mx-auto relative overflow-hidden transition-colors duration-300 bg-gov-bg text-gov-text-primary">
+      <Sidebar />
       {/* Loading Overlay */}
       <AnimatePresence>
         {isLoading && (
@@ -532,10 +774,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={cn(
-              "absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center",
-              isDarkMode ? "bg-black/60" : "bg-white/80"
-            )}
+            className="absolute inset-0 z-[100] backdrop-blur-sm flex flex-col items-center justify-center bg-white/80"
           >
             <RefreshCw className="text-gov-green animate-spin mb-2" size={40} />
             <p className="text-gov-green font-bold">جاري التحميل...</p>
@@ -544,13 +783,17 @@ export default function App() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className={cn(
-        "p-4 flex items-center justify-between sticky top-0 z-50 shadow-lg transition-colors",
-        isDarkMode ? "bg-gray-900 border-b border-gray-800" : "bg-gov-green text-white"
-      )}>
+      <header className="p-4 flex items-center justify-between sticky top-0 z-50 shadow-lg transition-colors bg-gov-green text-white">
         <div className="flex items-center gap-3">
-          {showBack && (
-            <button onClick={() => window.history.back()} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+          {isLoggedIn ? (
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-1 hover:bg-white/10 rounded-full transition-colors"
+            >
+              <Menu size={24} />
+            </button>
+          ) : showBack && (
+            <button onClick={goBack} className="p-1 hover:bg-white/10 rounded-full transition-colors">
               <ChevronRight size={24} />
             </button>
           )}
@@ -567,12 +810,11 @@ export default function App() {
                   </span>
                 )}
               </div>
-              <div 
-                onClick={() => navigate('PROFILE')}
-                className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center overflow-hidden border-2 border-white/30 cursor-pointer hover:border-white transition-all"
-              >
-                <img src={user.avatar} alt="User" className="w-full h-full object-cover" />
-              </div>
+              {showBack && screen !== 'DASHBOARD' && (
+                <button onClick={goBack} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+                  <ChevronLeft size={24} />
+                </button>
+              )}
             </>
           )}
           {!isLoggedIn && (
@@ -584,7 +826,7 @@ export default function App() {
       </header>
 
       {/* News Ticker */}
-      <NewsTicker isDarkMode={isDarkMode} />
+      <NewsTicker />
 
       {/* Content */}
       <main className="flex-1 p-4 pb-24 overflow-y-auto">
@@ -600,10 +842,7 @@ export default function App() {
 
       {/* Bottom Nav */}
       {showNav && isLoggedIn && (
-        <nav className={cn(
-          "fixed bottom-0 left-0 right-0 max-w-md mx-auto flex justify-around p-2 z-50 backdrop-blur-xl border-t transition-all duration-300",
-          isDarkMode ? "bg-gray-900/90 border-gray-800" : "bg-white/90 border-gray-200"
-        )}>
+        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto flex justify-around p-2 z-50 backdrop-blur-xl border-t transition-all duration-300 bg-white/90 border-gray-200">
           <button onClick={() => navigate('DASHBOARD')} className={cn('flex flex-col items-center p-2 gap-1 transition-colors relative', screen === 'DASHBOARD' ? 'text-gov-green' : 'text-gov-text-secondary')}>
             {screen === 'DASHBOARD' && <motion.div layoutId="nav-indicator" className="absolute -top-2 w-8 h-1 bg-gov-green rounded-b-full" />}
             <LayoutDashboard size={22} />
@@ -731,10 +970,7 @@ export default function App() {
             <input 
               type="text" 
               placeholder="ابحث عن خدمة (مثال: شهادة، معاش...)" 
-              className={cn(
-                "w-full pl-4 pr-10 py-3 rounded-xl border focus:border-gov-green focus:ring-1 focus:ring-gov-green outline-none transition-all",
-                isDarkMode ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-200 text-gray-900"
-              )}
+              className="w-full pl-4 pr-10 py-3 rounded-xl border focus:border-gov-green focus:ring-1 focus:ring-gov-green outline-none transition-all bg-white border-gray-200 text-gray-900"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -749,7 +985,6 @@ export default function App() {
                     key={item.id} 
                     item={item} 
                     onClick={() => navigateToService(item)} 
-                    isDarkMode={isDarkMode} 
                   />
                 ))
               ) : (
@@ -766,16 +1001,13 @@ export default function App() {
                 return (
                   <Card 
                     key={catKey} 
-                    className={cn(
-                      "flex flex-col items-center text-center gap-2 cursor-pointer hover:shadow-md transition-all p-4 border-2", 
-                      isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : "bg-white border-gray-100"
-                    )} 
+                    className="flex flex-col items-center text-center gap-2 cursor-pointer hover:shadow-md transition-all p-4 border-2 bg-white border-gray-100" 
                     onClick={() => navigateToCategory(catKey)}
                   >
-                    <div className={cn('p-4 rounded-full mb-1 bg-gov-bg text-gov-green')}>
+                    <div className="p-4 rounded-full mb-1 bg-gov-bg text-gov-green">
                       {cat.icon}
                     </div>
-                    <h3 className={cn("font-bold text-sm", isDarkMode ? "text-white" : "text-gov-text-primary")}>{cat.title}</h3>
+                    <h3 className="font-bold text-sm text-gov-text-primary">{cat.title}</h3>
                     <p className="text-[10px] text-gov-text-secondary leading-tight">
                       {cat.items.length} خدمات متاحة
                     </p>
@@ -801,7 +1033,6 @@ export default function App() {
               key={item.id} 
               item={item} 
               onClick={() => navigateToService(item)} 
-              isDarkMode={isDarkMode} 
             />
           ))}
         </div>
@@ -851,14 +1082,36 @@ export default function App() {
           }
           navigate('INQUIRY_RESULT');
         } else {
-          alert(result.message || 'فشل التحقق من البيانات');
+          setError(result.message || 'فشل التحقق من البيانات');
         }
         return;
       }
 
-      setTimeout(() => {
-        setIsLoading(false);
-        if (selectedService.type === 'INQUIRY') {
+      try {
+        if (selectedService.type === 'FORM') {
+          const requestId = 'REQ-' + Math.floor(1000 + Math.random() * 9000);
+          await setDoc(doc(db, 'requests', requestId), {
+            uid: currentUser?.uid,
+            type: selectedService.title,
+            status: 'PENDING',
+            date: new Date().toISOString(),
+            details: formData
+          });
+          
+          // Add notification
+          const notifId = 'NOT-' + Date.now();
+          await setDoc(doc(db, 'notifications', notifId), {
+            uid: currentUser?.uid,
+            title: 'تم استلام طلبك',
+            body: `تم استلام طلب ${selectedService.title} بنجاح وهو قيد المراجعة.`,
+            type: 'SUCCESS',
+            date: new Date().toISOString(),
+            read: false,
+            url: 'REQUESTS'
+          });
+          
+          setIsSubmitted(true);
+        } else if (selectedService.type === 'INQUIRY') {
           setInquiryData({
             title: selectedService.title,
             result: 'تم العثور على البيانات المطلوبة بنجاح. الحالة الحالية: نشط ومستحق.',
@@ -877,10 +1130,12 @@ export default function App() {
             ref: 'CALC-' + Math.floor(100000 + Math.random() * 900000)
           });
           navigate('INQUIRY_RESULT');
-        } else {
-          setIsSubmitted(true);
         }
-      }, 1500);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, 'requests');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     const handleSaveDraft = () => {
@@ -895,7 +1150,7 @@ export default function App() {
         };
         setDrafts([...drafts, newDraft]);
         setIsLoading(false);
-        alert('تم حفظ المسودة بنجاح');
+        addNotification('تم حفظ المسودة', 'تم حفظ مسودة الطلب بنجاح في قائمة المسودات.', 'SUCCESS');
         navigate('SERVICES');
       }, 1000);
     };
@@ -1125,7 +1380,7 @@ export default function App() {
     return (
       <PageWrapper title={selectedService.title}>
         <div className="space-y-5">
-          <Card className={cn("bg-gov-bg border-none", isDarkMode && "bg-gray-800")}>
+          <Card className="bg-gov-bg border-none">
             <p className="text-xs text-gov-text-secondary leading-relaxed">
               {selectedService.description}. يرجى تعبئة الحقول المطلوبة بدقة.
             </p>
@@ -1311,12 +1566,23 @@ export default function App() {
               <p className="text-[10px] text-gov-text-secondary">اضغط لرفع صور أو مستندات داعمة</p>
             </div>
           </div>
-          <Button className="w-full mt-4" onClick={() => {
+          <Button className="w-full mt-4" onClick={async () => {
             setIsLoading(true);
-            setTimeout(() => {
-              setIsLoading(false);
+            try {
+              const requestId = 'CMP-' + Math.floor(1000 + Math.random() * 9000);
+              await setDoc(doc(db, 'requests', requestId), {
+                uid: currentUser?.uid,
+                type: 'شكوى / مقترح',
+                status: 'PENDING',
+                date: new Date().toISOString(),
+                details: { title: 'شكوى جديدة' }
+              });
               setIsSubmitted(true);
-            }, 1500);
+            } catch (err) {
+              handleFirestoreError(err, OperationType.WRITE, 'requests');
+            } finally {
+              setIsLoading(false);
+            }
           }}>إرسال الشكوى</Button>
         </div>
       </PageWrapper>
@@ -1354,10 +1620,7 @@ export default function App() {
             <input 
               type="text" 
               placeholder="ابحث في الأسئلة..." 
-              className={cn(
-                "w-full pl-4 pr-10 py-2.5 rounded-xl border outline-none transition-all text-sm",
-                isDarkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200"
-              )}
+              className="w-full pl-4 pr-10 py-2.5 rounded-xl border outline-none transition-all text-sm bg-white border-gray-200"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -1373,7 +1636,7 @@ export default function App() {
                   "px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all",
                   activeCategory === cat 
                     ? "bg-gov-green text-white shadow-md" 
-                    : (isDarkMode ? "bg-gray-800 text-gray-400 border border-gray-700" : "bg-white text-gov-text-secondary border border-gray-100")
+                    : "bg-white text-gov-text-secondary border border-gray-100"
                 )}
               >
                 {cat}
@@ -1788,84 +2051,46 @@ export default function App() {
   );
 
   const LoginScreen = () => {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
     const [loginError, setLoginError] = useState<string | null>(null);
 
-    const handleLogin = () => {
-      if (!username || !password) {
-        setLoginError('يرجى إدخال اسم المستخدم وكلمة المرور');
-        return;
-      }
-      
-      setIsLoading(true);
-      setLoginError(null);
-      
-      // Simulate API call
-      setTimeout(() => {
-        setIsLoggedIn(true);
-        navigate('DASHBOARD');
-        setIsLoading(false);
-      }, 1500);
-    };
-
     return (
-      <div className={cn(
-        "min-h-screen flex flex-col max-w-md mx-auto p-6 justify-center transition-colors",
-        isDarkMode ? "bg-gray-950 text-white" : "bg-white text-gov-text-primary"
-      )}>
+      <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
         <div className="text-center mb-10">
-          <div className={cn(
-            "w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center",
-            isDarkMode ? "bg-gov-green/20" : "bg-gov-green/10"
-          )}>
+          <div className="w-24 h-24 bg-gov-green/10 rounded-full mx-auto mb-4 flex items-center justify-center">
             <img src="https://picsum.photos/seed/yemen-logo/200/200" alt="Authority Logo" className="w-16 h-16 object-contain" />
           </div>
-          <h1 className={cn("text-2xl font-bold", isDarkMode ? "text-gov-green" : "text-gov-green")}>الهيئة العامة للتأمينات والمعاشات</h1>
+          <h1 className="text-2xl font-bold text-gov-green">الهيئة العامة للتأمينات والمعاشات</h1>
           <p className="text-gov-text-secondary">فرع تَعِز - الجمهورية اليمنية</p>
         </div>
 
         <div className="space-y-4">
-          <Input 
-            label="رقم الهوية / الرقم التأميني" 
-            placeholder="أدخل الرقم هنا" 
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            error={loginError && !username ? loginError : undefined}
-          />
-          <Input 
-            label="كلمة المرور" 
-            type="password" 
-            placeholder="********" 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={loginError && !password ? loginError : undefined}
-          />
-          
-          {loginError && username && password && (
-            <p className="text-xs text-gov-error text-center">{loginError}</p>
-          )}
-          
-          <div className="flex justify-between items-center text-sm">
-            <button className="text-gov-link hover:underline">نسيت كلمة المرور؟</button>
-          </div>
-
-          <Button className="w-full py-3" onClick={handleLogin} disabled={isLoading}>
+          <Button 
+            className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
+            onClick={loginWithGoogle} 
+            disabled={isLoading}
+          >
             {isLoading ? (
               <RefreshCw size={20} className="animate-spin" />
             ) : (
               <>
-                <LogIn size={20} /> تسجيل الدخول
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+                تسجيل الدخول بواسطة جوجل
               </>
             )}
           </Button>
 
-          <div className="text-center pt-4">
-            <p className="text-sm text-gov-text-secondary">
-              ليس لديك حساب؟{' '}
-              <button onClick={() => navigate('REGISTER')} className="text-gov-link font-bold hover:underline">إنشاء حساب جديد</button>
-            </p>
+          {error && (
+            <p className="text-xs text-gov-error text-center bg-red-50 p-2 rounded-lg">{error}</p>
+          )}
+          
+          <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">أو</span></div>
           </div>
+
+          <p className="text-xs text-center text-gov-text-secondary leading-relaxed">
+            بمجرد تسجيل الدخول، يمكنك الوصول إلى كافة الخدمات الإلكترونية للهيئة وتتبع طلباتك ومعاملاتك بكل سهولة.
+          </p>
         </div>
 
         <div className="mt-auto pt-10 text-center">
@@ -1878,33 +2103,41 @@ export default function App() {
   };
 
   const RegisterScreen = () => (
-    <div className={cn(
-      "min-h-screen flex flex-col max-w-md mx-auto p-6 transition-colors",
-      isDarkMode ? "bg-gray-950 text-white" : "bg-white text-gov-text-primary"
-    )}>
-      <div className="flex items-center gap-2 mb-8">
-        <button onClick={() => navigate('LOGIN')} className="p-1"><ChevronRight size={24} /></button>
-        <h1 className="text-xl font-bold text-gov-green">إنشاء حساب جديد</h1>
+    <div className="min-h-screen flex flex-col max-w-md mx-auto bg-white p-6 justify-center">
+      <div className="text-center mb-10">
+        <div className="w-24 h-24 bg-gov-green/10 rounded-full mx-auto mb-4 flex items-center justify-center">
+          <img src="https://picsum.photos/seed/yemen-logo/200/200" alt="Authority Logo" className="w-16 h-16 object-contain" />
+        </div>
+        <h1 className="text-2xl font-bold text-gov-green">إنشاء حساب جديد</h1>
+        <p className="text-gov-text-secondary">انضم إلى المنصة الإلكترونية للهيئة</p>
       </div>
 
-      <div className="space-y-4 flex-1">
-        <Input label="الاسم الكامل" placeholder="أدخل اسمك الرباعي" />
-        <Input label="رقم الهوية / الرقم التأميني" placeholder="أدخل الرقم" />
-        <Input label="البريد الإلكتروني" type="email" placeholder="example@mail.com" />
-        <Input label="رقم الهاتف" placeholder="777XXXXXX" />
-        <Input label="كلمة المرور" type="password" placeholder="********" />
-        <Input label="تأكيد كلمة المرور" type="password" placeholder="********" />
-        
-        <div className="flex items-start gap-2 py-2">
-          <input type="checkbox" className="mt-1" id="terms" />
-          <label htmlFor="terms" className="text-xs text-gov-text-secondary leading-relaxed">
-            أوافق على <span className="text-gov-link underline">شروط الاستخدام</span> و <span className="text-gov-link underline">سياسة الخصوصية</span> الخاصة بالهيئة.
-          </label>
-        </div>
-
-        <Button className="w-full py-3" onClick={() => navigate('LOGIN')}>
-          <UserPlus size={20} /> إنشاء الحساب
+      <div className="space-y-6">
+        <Button 
+          className="w-full py-4 bg-white border-2 border-gray-100 text-gray-700 hover:bg-gray-50 shadow-sm" 
+          onClick={loginWithGoogle} 
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <RefreshCw size={20} className="animate-spin" />
+          ) : (
+            <>
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              التسجيل بواسطة جوجل
+            </>
+          )}
         </Button>
+
+        <p className="text-xs text-center text-gov-text-secondary leading-relaxed px-4">
+          من خلال إنشاء حساب، فإنك توافق على <span className="text-gov-link underline">شروط الاستخدام</span> و <span className="text-gov-link underline">سياسة الخصوصية</span> الخاصة بالهيئة.
+        </p>
+
+        <div className="text-center pt-4">
+          <p className="text-sm text-gov-text-secondary">
+            لديك حساب بالفعل؟{' '}
+            <button onClick={() => navigate('LOGIN')} className="text-gov-link font-bold hover:underline">تسجيل الدخول</button>
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -1913,10 +2146,7 @@ export default function App() {
     <PageWrapper title="لوحة التحكم" showBack={false}>
       <div className="space-y-6">
         {/* Welcome Card */}
-        <div className={cn(
-          "p-6 rounded-gov shadow-lg relative overflow-hidden transition-colors",
-          isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gov-green text-white"
-        )}>
+        <div className="p-6 rounded-gov shadow-lg relative overflow-hidden transition-colors bg-gov-green text-white">
           <div className="relative z-10">
             <p className="text-sm opacity-80">مرحباً بك،</p>
             <h2 className="text-xl font-bold mb-4">{user.name}</h2>
@@ -1934,14 +2164,11 @@ export default function App() {
               </div>
             </div>
           </div>
-          <div className={cn(
-            "absolute -bottom-10 -left-10 w-40 h-40 rounded-full blur-3xl",
-            isDarkMode ? "bg-gov-green/20" : "bg-white/10"
-          )} />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full blur-3xl bg-white/10" />
         </div>
 
         {/* Track Request Widget */}
-        <Card className="shadow-sm">
+        <Card className="shadow-sm bg-white border-gray-100">
           <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-gov-green">
             <Search size={18} /> تتبع معاملة / طلب
           </h3>
@@ -1949,12 +2176,7 @@ export default function App() {
             <input 
               type="text" 
               placeholder="أدخل رقم الطلب (مثال: REQ-001)" 
-              className={cn(
-                "flex-1 px-3 py-2 rounded-lg border text-sm outline-none transition-colors",
-                isDarkMode 
-                  ? "bg-gray-900 border-gray-700 text-white focus:border-gov-green" 
-                  : "bg-white border-gray-200 text-gov-text-primary focus:border-gov-green"
-              )}
+              className="flex-1 px-3 py-2 rounded-lg border text-sm outline-none transition-colors bg-white border-gray-200 text-gov-text-primary focus:border-gov-green"
             />
             <Button className="py-2 px-4 text-sm" onClick={() => {
               setIsLoading(true);
@@ -1968,46 +2190,46 @@ export default function App() {
 
         {/* Quick Services Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('BASIC_DATA')}>
-            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-600")}><User size={24} /></div>
+          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('BASIC_DATA')}>
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-full"><User size={24} /></div>
             <span className="text-sm font-bold">بياناتي</span>
           </Card>
-          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('REQUESTS')}>
-            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-green-900/30 text-green-400" : "bg-green-50 text-green-600")}><FileText size={24} /></div>
+          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('REQUESTS')}>
+            <div className="p-3 bg-green-50 text-green-600 rounded-full"><FileText size={24} /></div>
             <span className="text-sm font-bold">طلباتي</span>
           </Card>
-          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('DRAFTS')}>
-            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-orange-900/30 text-orange-400" : "bg-orange-50 text-orange-600")}><Edit2 size={24} /></div>
+          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('DRAFTS')}>
+            <div className="p-3 bg-orange-50 text-orange-600 rounded-full"><Edit2 size={24} /></div>
             <span className="text-sm font-bold">المسودات</span>
           </Card>
-          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('DOCUMENTS')}>
-            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-purple-900/30 text-purple-400" : "bg-purple-50 text-purple-600")}><Upload size={24} /></div>
+          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('DOCUMENTS')}>
+            <div className="p-3 bg-purple-50 text-purple-600 rounded-full"><Upload size={24} /></div>
             <span className="text-sm font-bold">وثائقي</span>
           </Card>
-          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green" onClick={() => navigate('ABOUT')}>
-            <div className={cn("p-3 rounded-full", isDarkMode ? "bg-teal-900/30 text-teal-400" : "bg-teal-50 text-teal-600")}><Info size={24} /></div>
+          <Card className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('ABOUT')}>
+            <div className="p-3 bg-teal-50 text-teal-600 rounded-full"><Info size={24} /></div>
             <span className="text-sm font-bold">عن الهيئة</span>
           </Card>
         </div>
 
         {/* Additional Services */}
         <div>
-          <h3 className={cn("font-bold mb-3", isDarkMode ? "text-white" : "text-gov-text-primary")}>خدمات إضافية</h3>
+          <h3 className="font-bold text-gov-text-primary mb-3">خدمات إضافية</h3>
           <div className="grid grid-cols-2 gap-3">
-            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('COMPLAINT_TRACKING')}>
-              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-red-900/30 text-red-400" : "bg-red-50 text-red-600")}><MessageSquare size={20} /></div>
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('COMPLAINT_TRACKING')}>
+              <div className="p-2 bg-red-50 text-red-600 rounded-lg"><MessageSquare size={20} /></div>
               <span className="text-xs font-bold">تتبع الشكاوى</span>
             </Card>
-            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('INSURANCE_CALC')}>
-              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-indigo-900/30 text-indigo-400" : "bg-indigo-50 text-indigo-600")}><Calculator size={20} /></div>
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('INSURANCE_CALC')}>
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Calculator size={20} /></div>
               <span className="text-xs font-bold">حاسبة التأمين</span>
             </Card>
-            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('LAWS')}>
-              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-teal-900/30 text-teal-400" : "bg-teal-50 text-teal-600")}><Scale size={20} /></div>
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('LAWS')}>
+              <div className="p-2 bg-teal-50 text-teal-600 rounded-lg"><Scale size={20} /></div>
               <span className="text-xs font-bold">قوانين وتشريعات</span>
             </Card>
-            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green" onClick={() => navigate('FORMS')}>
-              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-yellow-900/30 text-yellow-400" : "bg-yellow-50 text-yellow-600")}><FileBox size={20} /></div>
+            <Card className="flex items-center gap-3 p-3 cursor-pointer hover:border-gov-green bg-white border-gray-100" onClick={() => navigate('FORMS')}>
+              <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><FileBox size={20} /></div>
               <span className="text-xs font-bold">النماذج</span>
             </Card>
           </div>
@@ -2016,18 +2238,17 @@ export default function App() {
         {/* Recent Requests */}
         <div>
           <div className="flex justify-between items-center mb-3">
-            <h3 className={cn("font-bold", isDarkMode ? "text-white" : "text-gov-text-primary")}>الطلبات الأخيرة</h3>
+            <h3 className="font-bold text-gov-text-primary">الطلبات الأخيرة</h3>
             <button onClick={() => navigate('REQUESTS')} className="text-xs text-gov-link">عرض الكل</button>
           </div>
           <div className="space-y-2">
             {requests.slice(0, 2).map((req) => (
-              <Card key={req.id} className="flex items-center justify-between p-3" onClick={() => { setSelectedRequest(req); navigate('REQUEST_DETAILS'); }}>
+              <Card key={req.id} className="flex items-center justify-between p-3 bg-white border-gray-100" onClick={() => { setSelectedRequest(req); navigate('REQUEST_DETAILS'); }}>
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'p-2 rounded-full',
-                    req.status === 'APPROVED' ? (isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-600') : 
-                    req.status === 'PENDING' ? (isDarkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-50 text-orange-600') : 
-                    (isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-50 text-red-600')
+                    req.status === 'APPROVED' ? 'bg-green-50 text-green-600' : 
+                    req.status === 'PENDING' ? 'bg-orange-50 text-orange-600' : 'bg-red-50 text-red-600'
                   )}>
                     {req.status === 'APPROVED' ? <CheckCircle2 size={16} /> : req.status === 'PENDING' ? <Clock size={16} /> : <XCircle size={16} />}
                   </div>
@@ -2059,20 +2280,14 @@ export default function App() {
   const BasicDataScreen = () => (
     <PageWrapper title="البيانات الأساسية">
       <div className="space-y-4">
-        <Card className="text-center py-8 relative overflow-hidden">
+        <Card className="text-center py-8 relative overflow-hidden bg-white border-gray-100">
           <div className="absolute top-0 right-0 w-24 h-24 bg-gov-green/5 rounded-bl-full -mr-10 -mt-10" />
-          <div className={cn(
-            "w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-4 shadow-lg relative z-10",
-            isDarkMode ? "bg-gray-700 border-gray-900" : "bg-gray-100 border-white"
-          )}>
+          <div className="w-24 h-24 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg relative z-10">
             <img src={user.avatar} alt="User" className="w-full h-full object-cover" />
           </div>
           <h2 className="text-xl font-bold relative z-10">{user.name}</h2>
           <p className="text-sm text-gov-text-secondary font-mono relative z-10">{user.insuranceNumber}</p>
-          <div className={cn(
-            "mt-4 inline-flex items-center gap-2 px-4 py-1.5 text-xs rounded-full font-bold border relative z-10",
-            isDarkMode ? "bg-green-900/30 text-green-400 border-green-900/50" : "bg-green-50 text-green-700 border-green-100"
-          )}>
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 bg-green-50 text-green-700 text-xs rounded-full font-bold border border-green-100 relative z-10">
             <CheckCircle2 size={14} />
             الحالة: {user.status}
           </div>
@@ -2085,8 +2300,8 @@ export default function App() {
             { label: 'رقم الهاتف الجوال', value: user.phone, icon: <Activity size={18} className="text-green-500" /> },
             { label: 'عنوان السكن الحالي', value: user.address, icon: <Home size={18} className="text-purple-500" /> },
           ].map((item, idx) => (
-            <Card key={idx} className="flex items-center gap-4 p-4">
-              <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-gray-900" : "bg-gray-50")}>
+            <Card key={idx} className="flex items-center gap-4 p-4 bg-white border-gray-100">
+              <div className="p-2 bg-gray-50 rounded-lg">
                 {item.icon}
               </div>
               <div className="flex-1">
@@ -2110,7 +2325,7 @@ export default function App() {
           <Button variant="outline" className="justify-start h-14" onClick={() => navigate('SUBSCRIPTIONS')}>
             <Activity size={20} /> عرض سجل الاشتراكات
           </Button>
-          <Button variant="danger" className="mt-6 h-12" onClick={() => { setIsLoggedIn(false); navigate('LOGIN'); }}>
+          <Button variant="danger" className="mt-6 h-12" onClick={handleLogout}>
             <LogOut size={20} /> تسجيل الخروج
           </Button>
         </div>
@@ -2121,7 +2336,7 @@ export default function App() {
   const SubscriptionsScreen = () => (
     <PageWrapper title="سجل الاشتراكات">
       <div className="space-y-4">
-        <Card className={cn("bg-gov-green text-white border-none shadow-gov-green/20")}>
+        <Card className="bg-gov-green text-white border-none shadow-gov-green/20">
           <p className="text-xs opacity-80">إجمالي الاشتراكات النشطة</p>
           <h2 className="text-2xl font-bold">14,500 ر.ي</h2>
           <p className="text-[10px] mt-2">آخر تحديث: {new Date().toLocaleDateString('ar-YE')}</p>
@@ -2130,17 +2345,14 @@ export default function App() {
         <div className="space-y-3">
           <h3 className="font-bold text-sm">تفاصيل الدفعات</h3>
           {subscriptions.map((sub) => (
-            <Card key={sub.id} className="flex justify-between items-center">
+            <Card key={sub.id} className="flex justify-between items-center bg-white border-gray-100">
               <div>
                 <p className="text-sm font-bold">{sub.period}</p>
                 <p className="text-[10px] text-gov-text-secondary">رقم العملية: {sub.id}</p>
               </div>
               <div className="text-left">
                 <p className="text-sm font-bold text-gov-green">{sub.amount}</p>
-                <span className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full",
-                  isDarkMode ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700"
-                )}>ناجحة</span>
+                <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full">ناجحة</span>
               </div>
             </Card>
           ))}
@@ -2153,7 +2365,7 @@ export default function App() {
     <PageWrapper title="الجهات الحكومية">
       <div className="space-y-4">
         {govAgencies.map((agency) => (
-          <Card key={agency.id} className="space-y-3">
+          <Card key={agency.id} className="space-y-3 bg-white border-gray-100">
             <div className="flex justify-between items-start">
               <h3 className="font-bold text-gov-green">{agency.name}</h3>
               <a href={agency.link} target="_blank" rel="noreferrer" className="text-gov-link text-xs flex items-center gap-1">
@@ -2164,14 +2376,11 @@ export default function App() {
               <Home size={16} />
               <span>{agency.contact}</span>
             </div>
-            <div className={cn("pt-2 border-t", isDarkMode ? "border-gray-700" : "border-gray-100")}>
+            <div className="pt-2 border-t border-gray-100">
               <p className="text-xs font-bold mb-2">الخدمات المتاحة:</p>
               <div className="flex flex-wrap gap-2">
                 {agency.services.map((service, i) => (
-                  <span key={i} className={cn(
-                    "text-[10px] px-2 py-1 rounded-full",
-                    isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gov-text-primary"
-                  )}>
+                  <span key={i} className="text-[10px] px-2 py-1 bg-gray-100 rounded-full text-gov-text-primary">
                     {service}
                   </span>
                 ))}
@@ -2221,7 +2430,7 @@ export default function App() {
             </div>
             <ChevronLeft size={18} />
           </Button>
-          <Button variant="danger" className="w-full mt-8" onClick={() => { setIsLoggedIn(false); navigate('LOGIN'); }}>
+          <Button variant="danger" className="w-full mt-8" onClick={handleLogout}>
             <LogOut size={18} /> تسجيل الخروج
           </Button>
         </div>
@@ -2234,7 +2443,7 @@ export default function App() {
       <div className="space-y-6">
         <section>
           <h3 className="text-xs font-bold text-gov-text-secondary uppercase mb-3 px-2">تفضيلات التطبيق</h3>
-          <Card className={cn("space-y-4", isDarkMode && "bg-gray-800 border-gray-700")}>
+          <Card className="space-y-4 bg-white border-gray-100">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <Bell size={18} className="text-gov-green" />
@@ -2301,24 +2510,6 @@ export default function App() {
 
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <Activity size={18} className="text-gov-green" />
-                <span className="text-sm font-bold">الوضع الداكن</span>
-              </div>
-              <button 
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className={cn(
-                  "w-12 h-6 rounded-full relative transition-colors",
-                  isDarkMode ? "bg-gov-green" : "bg-gray-300"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                  isDarkMode ? "left-1" : "left-7"
-                )} />
-              </button>
-            </div>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
                 <Info size={18} className="text-gov-green" />
                 <span className="text-sm font-bold">اللغة</span>
               </div>
@@ -2336,7 +2527,7 @@ export default function App() {
 
         <section>
           <h3 className="text-xs font-bold text-gov-text-secondary uppercase mb-3 px-2">تجربة الميزات</h3>
-          <Card className={cn(isDarkMode && "bg-gray-800 border-gray-700")}>
+          <Card className="bg-white border-gray-100">
             <Button 
               variant="outline" 
               className="w-full flex items-center justify-center gap-2"
@@ -2349,7 +2540,7 @@ export default function App() {
 
         <section>
           <h3 className="text-xs font-bold text-gov-text-secondary uppercase mb-3 px-2">قانوني</h3>
-          <Card className={cn("space-y-4", isDarkMode && "bg-gray-800 border-gray-700")}>
+          <Card className="space-y-4 bg-white border-gray-100">
             <button className="w-full flex justify-between items-center text-sm font-bold">
               <span>سياسة الخصوصية</span>
               <ChevronLeft size={16} />
@@ -2652,15 +2843,12 @@ export default function App() {
               <button
                 key={idx}
                 onClick={() => navigate(item.screen as Screen)}
-                className={cn(
-                  "flex items-center gap-4 w-full p-4 rounded-xl transition-all hover:translate-x-[-4px] active:scale-95",
-                  isDarkMode ? "hover:bg-gray-800" : "hover:bg-gray-50"
-                )}
+                className="flex items-center gap-4 w-full p-4 rounded-xl transition-all hover:translate-x-[-4px] active:scale-95 hover:bg-gray-50"
               >
                 <div className={cn("p-2.5 rounded-lg shrink-0", item.bg, item.color)}>
                   {item.icon}
                 </div>
-                <span className={cn("font-bold text-sm flex-1 text-right", isDarkMode ? "text-white" : "text-gov-text-primary")}>
+                <span className="font-bold text-sm flex-1 text-right text-gov-text-primary">
                   {item.title}
                 </span>
                 <ChevronLeft size={18} className="text-gray-300" />
@@ -2702,8 +2890,7 @@ export default function App() {
               key={notif.id} 
               className={cn(
                 "p-4 border-r-4 transition-all hover:shadow-md cursor-pointer",
-                !notif.read ? "bg-white border-r-gov-green" : "bg-gray-50 border-r-gray-300 opacity-80",
-                isDarkMode && (notif.read ? "bg-gray-800/50 border-r-gray-700" : "bg-gray-800 border-r-gov-green")
+                !notif.read ? "bg-white border-r-gov-green" : "bg-gray-50 border-r-gray-300 opacity-80"
               )}
               onClick={() => {
                 setNotifications(notifications.map(n => n.id === notif.id ? { ...n, read: true } : n));
